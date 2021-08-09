@@ -140,13 +140,13 @@ class ODENVP(nn.Module):
         zs = []
         i = 0
         for dims in self.dims:
-            s = np.prod(dims)
+            s = np.prod(dims) #256x256
             zs.append(z[:, i:i + s])
             i += s
-        zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, self.dims)]
+        zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, self.dims)] # I believe this is squeezing the noise/latent to match the output of the 'final' layer?
         _logpz = torch.zeros(zs[0].shape[0], 1).to(zs[0]) if logpz is None else logpz
         z_prev, _logpz, _ = self.transforms[-1](zs[-1], _logpz, reverse=True)
-        for idx in range(len(self.transforms) - 2, -1, -1):
+        for idx in range(len(self.transforms) - 2, -1, -1): # if len(self.transforms) is 10 then idx will be 8,7,..,1,0
             z_prev = torch.cat((z_prev, zs[idx]), dim=1)
             z_prev, _logpz, reg_states = self.transforms[idx](z_prev, _logpz, reg_states, reverse=True)
         return z_prev, _logpz, reg_states

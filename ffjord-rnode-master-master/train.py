@@ -266,7 +266,7 @@ def get_dataset(args):
 def compute_bits_per_dim(x, model):
     zero = torch.zeros(x.shape[0], 1).to(x)
 
-    z, delta_logp, reg_states = model(x, zero)  # run model forward
+    z, delta_logp, reg_states = model(x, zero)  # run model forward (is this not runnning backwards? Or does it mean run density of z forward)
 
     reg_states = tuple(torch.mean(rs) for rs in reg_states)
 

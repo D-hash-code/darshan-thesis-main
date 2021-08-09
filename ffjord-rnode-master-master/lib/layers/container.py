@@ -12,7 +12,7 @@ class SequentialFlow(nn.Module):
     def forward(self, x, logpx=None, reg_states=tuple(), reverse=False, inds=None):
         if inds is None:
             if reverse:
-                inds = range(len(self.chain) - 1, -1, -1)
+                inds = range(len(self.chain) - 1, -1, -1) # if len(self.chain) is 10, then inds = 9,8,...,1,0
             else:
                 inds = range(len(self.chain))
 
