@@ -82,9 +82,6 @@ def run(config):
 
     import train_fns
 
-    if config["dataset"]=="coco_animals":
-        folders = ['bird','cat','dog','horse','sheep','cow','elephant','monkey','zebra','giraffe']
-
     # Update the config dict as necessary This is for convenience, to add settings derived from the user-specified configuration into the
     # config-dict (e.g. inferring the number of classes and size of the images from the dataset, passing in a pytorch object for the
     # activation specified as a string)
@@ -113,6 +110,8 @@ def run(config):
                        else utils.name_from_config(config))
     print('Experiment name is %s' % experiment_name)
     print("::: weights saved at ", '/'.join([config['weights_root'],experiment_name]) )
+
+
     # Next, build the model
     keys = sorted(config.keys())
     for k in keys:
@@ -186,6 +185,9 @@ def run(config):
         GD = nn.DataParallel(GD)
     if config['cross_replica']:
         patch_replication_callback(GD)
+    
+    
+    
     # Prepare loggers for stats; metrics holds test metrics, lmetrics holds any desired training metrics.
     test_metrics_fname = '%s/%s_log.jsonl' % (config['logs_root'],
                                             experiment_name)
@@ -197,6 +199,8 @@ def run(config):
     train_log = utils.MyLogger(train_metrics_fname,
                              reinitialize=(not config['resume']),
                              logstyle=config['logstyle'])
+    
+    
     # Write metadata
     utils.write_metadata(config['logs_root'], experiment_name, config, state_dict)
     # Prepare data; the Discriminator's batch size is all that needs to be passed to the dataloader, as G doesn't require dataloading. Note
@@ -205,29 +209,7 @@ def run(config):
                   * config['num_D_accumulations'])
 
 
-
-    if config["dataset"]=="FFHQ":
-
-        root = config["data_folder"]
-        root_perm =  config["data_folder"]
-
-        transform = transforms.Compose(
-            [
-                transforms.Scale(config["resolution"]),
-                transforms.CenterCrop(config["resolution"]),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
-            ]
-        )
-
-        batch_size = config['batch_size']
-        print("rooooot:",root)
-        dataset = FFHQ(root = root, transform = transform, batch_size = batch_size*config["num_D_accumulations"], imsize = config["resolution"])
-        data_loader = DataLoader(dataset, batch_size, shuffle = True, drop_last = True)
-        loaders = [data_loader]
-
-    elif config["dataset"]=="celeba128":
+    if config["dataset"]=="celeba128":
 
         root =  config["data_folder"] #
         root_perm =  config["data_folder"]
@@ -244,28 +226,6 @@ def run(config):
         batch_size = config['batch_size']
         dataset = Celeba(root = root, transform = transform, batch_size = batch_size*config["num_D_accumulations"], imsize = config["resolution"])
         data_loader = DataLoader(dataset, batch_size, shuffle = True, drop_last = True)
-        loaders = [data_loader]
-
-
-    elif config["dataset"]=="coco_animals":
-
-        batch_size = config['batch_size']
-
-        transform=transforms.Compose(
-                [ transforms.Resize(config["resolution"]),
-                    transforms.CenterCrop(config["resolution"]),
-                    transforms.RandomHorizontalFlip(),
-                    #transforms.ColorJitter(brightness=0.01, contrast=0.01, saturation=0.01, hue=0.01),
-                    transforms.ToTensor(),
-                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                ])
-        classes = ['bird','cat','dog','horse','sheep','cow','elephant','monkey','zebra','giraffe']
-
-        root = config["data_folder"]
-        root_perm = config["data_folder"]
-
-        dataset = CocoAnimals(root=root, batch_size = batch_size*config["num_D_accumulations"], classes = classes, transform=transform , imsize = config["resolution"])
-        data_loader = DataLoader(dataset,batch_size*config["num_D_accumulations"],drop_last=True,num_workers=1)#,shuffle=False)
         loaders = [data_loader]
 
 

@@ -32,6 +32,13 @@ def BCEloss(D_fake, D_real, d_real_target, d_fake_target):
 def BCEfakeloss(D_fake,target):
     return F.binary_cross_entropy_with_logits(D_fake, target.expand_as(D_fake))
 
+
+
+
+
+
+
+
 def GAN_training_function(G, D, GD, z_, y_, ema, state_dict, config):
     def train(x, y, epoch, batch_size, target_map = None, r_mixup = 0.0):
         G.optim.zero_grad()
@@ -293,6 +300,16 @@ def GAN_training_function(G, D, GD, z_, y_, ema, state_dict, config):
 
         return out
     return train
+
+
+
+
+
+
+
+
+
+
 
 ''' This function takes in the model, saves the weights (multiple copies if
         requested), and prepares sample sheets: one consisting of samples given
