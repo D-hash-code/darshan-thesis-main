@@ -28,6 +28,7 @@ import datasets as dset
 
 
 def prepare_parser():
+  SOLVERS = ["dopri5", "bdf", "rk4", "midpoint", 'adams', 'explicit_adams', 'adaptive_heun', 'bosh3']
   usage = 'Parser for all scripts.'
   parser = ArgumentParser(description=usage)
   parser.add_argument("--data_folder", type=str)
@@ -80,7 +81,7 @@ def prepare_parser():
 
   ### Model stuff ###
   parser.add_argument(
-    '--model', type=str, default='BigGAN',
+    '--model', type=str, default='unet_d',
     help='Name of the model module (default: %(default)s)')
   parser.add_argument(
     '--G_param', type=str, default='SN',
@@ -380,6 +381,86 @@ def prepare_parser():
     '--sv_log_interval', type=int, default=10,
     help='Iteration interval for logging singular values '
          ' (default: %(default)s)')
+  
+
+
+
+  parser.add_argument("--datadir", default="./data/")
+  parser.add_argument("--nworkers", type=int, default=4)
+  parser.add_argument("--data", choices=["mnist", "svhn", "cifar10", 'lsun_church', 'celebahq', 'imagenet64'], 
+          type=str, default="mnist")
+  parser.add_argument("--dims", type=str, default="64,64,64")
+  parser.add_argument("--strides", type=str, default="1,1,1,1")
+  parser.add_argument("--num_blocks", type=int, default=26, help='Number of stacked CNFs.')
+
+  parser.add_argument(
+      "--layer_type", type=str, default="concat",
+      choices=["ignore", "concat"]
+  )
+  parser.add_argument("--divergence_fn", type=str, default="approximate", choices=["brute_force", "approximate"])
+  parser.add_argument(
+      "--nonlinearity", type=str, default="softplus", choices=["tanh", "relu", "softplus", "elu"]
+  )
+  parser.add_argument('--solver', type=str, default='rk4', choices=SOLVERS)
+  parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'sgd'])
+  parser.add_argument('--atol', type=float, default=1e-5, help='only for adaptive solvers')
+  parser.add_argument('--rtol', type=float, default=1e-5,  help='only for adaptive solvers')
+  parser.add_argument('--step_size', type=float, default=0.25, help='only for fixed step size solvers')
+  parser.add_argument('--first_step', type=float, default=0.166667, help='only for adaptive solvers')
+
+  parser.add_argument('--test_solver', type=str, default='rk4', choices=SOLVERS + [None])
+  parser.add_argument('--test_atol', type=float, default=1e-5)
+  parser.add_argument('--test_rtol', type=float, default=1e-5)
+  parser.add_argument('--test_step_size', type=float, default=None)
+  parser.add_argument('--test_first_step', type=float, default=None)
+
+  parser.add_argument("--imagesize", type=int, default=None)
+  parser.add_argument("--alpha", type=float, default=1e-6)
+  parser.add_argument('--time_length', type=float, default=1.0)
+  parser.add_argument('--train_T', type=eval, default=False)
+
+  parser.add_argument("--num_epochs", type=int, default=20)
+  parser.add_argument("--batch_size", type=int, default=3)
+  parser.add_argument(
+      "--batch_size_schedule", type=str, default="", help="Increases the batchsize at every given epoch, dash separated."
+  )
+  parser.add_argument("--test_batch_size", type=int, default=3)
+  parser.add_argument("--lr", type=float, default=1e-3)
+  parser.add_argument("--warmup_iters", type=float, default=1000)
+  parser.add_argument("--weight_decay", type=float, default=0.)
+
+  parser.add_argument("--add_noise", type=eval, default=True, choices=[True, False])
+  parser.add_argument('--nbits', type=int, default=5)
+  parser.add_argument('--div_samples',type=int, default=1)
+  parser.add_argument('--squeeze_first', type=eval, default=False, choices=[True, False])
+  parser.add_argument('--zero_last', type=eval, default=True, choices=[True, False])
+  parser.add_argument('--seed', type=int, default=42)
+
+  # Regularizations
+  parser.add_argument('--kinetic-energy', type=float, default=0.01, help="int_t ||f||_2^2")
+  parser.add_argument('--jacobian-norm2', type=float, default=0.01, help="int_t ||df/dx||_F^2")
+  parser.add_argument('--total-deriv', type=float, default=None, help="int_t ||df/dt||^2")
+  parser.add_argument('--directional-penalty', type=float, default=None, help="int_t ||(df/dx)^T f||^2")
+
+  parser.add_argument(
+      "--max_grad_norm", type=float, default=np.inf,
+      help="Max norm of graidents"
+  )
+
+  parser.add_argument("--resume", type=str, default=None, help='path to saved check point')
+  parser.add_argument("--save", type=str, default="../experiments/celebahq/example/")
+  parser.add_argument("--val_freq", type=int, default=1)
+  parser.add_argument("--log_freq", type=int, default=1)
+  parser.add_argument('--validate', type=eval, default=False, choices=[True, False])
+
+  parser.add_argument('--distributed', action='store_true', help='Run distributed training. Default True')
+  parser.add_argument('--dist-url', default='env://', type=str,
+                      help='url used to set up distributed training')
+  parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
+  parser.add_argument('--local_rank', default=0, type=int,
+                      help='Used for multi-process training. Can either be manually set ' +
+                      'or automatically set by using \'python -m multiproc\'.')
+
 
   return parser
 
@@ -605,11 +686,6 @@ def get_data_loaders(dataset, data_root=None, augment=False, batch_size=64,
   return loaders
 
 
-# Utility file to seed rngs
-def seed_rng(seed):
-  torch.manual_seed(seed)
-  torch.cuda.manual_seed(seed)
-  np.random.seed(seed)
 
 
 # Utility to peg all roots to a base root
@@ -1154,14 +1230,12 @@ class Distribution(torch.Tensor):
 
 
 # Convenience function to prepare a z and y vector
-def prepare_z_y(G_batch_size, dim_z, nclasses, device='cuda',
+def prepare_z_y(G_batch_size, dim_z, nclasses=1, device='cuda',
                 fp16=False,z_var=1.0, z_distribution = 'normal'):
   z_ = Distribution(torch.randn(G_batch_size, dim_z, requires_grad=False))
   z_.init_distribution(z_distribution, mean=0, var=z_var, bs = G_batch_size)
-  z_ = z_.to(device,torch.float16 if fp16 else torch.float32)
+  z_ = z_.to(device,torch.float32)
 
-  if fp16:
-    z_ = z_.half()
 
   y_ = Distribution(torch.zeros(G_batch_size, requires_grad=False))
   y_.init_distribution('categorical',num_categories=nclasses)

@@ -10,7 +10,6 @@ python train.py \
 --G_eval_mode \
 --D_ch 64 \
 --hier --dim_z 128 \
---ema --use_ema --ema_start 21000 \
 --accumulate_stats --num_standing_accumulations 100  \
 --test_every 10000 --save_every 10000 --num_best_copies 2 --num_save_copies 1 --seed 0 \
 --sample_every 4000   \
@@ -36,7 +35,6 @@ python train.py \
 --G_eval_mode \
 --G_ch 64 --D_ch 64 \
 --hier --dim_z 128 \
---ema --use_ema --ema_start 21000 \
 --accumulate_stats --num_standing_accumulations 100  \
 --test_every 10000 --save_every 10000 --num_best_copies 2 --num_save_copies 1 --seed 0 \
 --sample_every 4000   \

@@ -435,12 +435,7 @@ class Generator(nn.Module):
         if self.unconditional:
             bn_linear = nn.Linear
             input_size =  self.dim_z  + (self.shared_dim if self.G_shared else 0 )
-        else:
-            bn_linear = (functools.partial(self.which_linear, bias = False) if self.G_shared
-                                     else self.which_embedding)
 
-            input_size = (self.shared_dim + self.z_chunk_size if self.G_shared
-                                    else self.n_classes)
         self.which_bn = functools.partial(layers.ccbn,
                                                     which_linear=bn_linear,
                                                     cross_replica=self.cross_replica,
@@ -569,7 +564,6 @@ class Generator(nn.Module):
 
         # Apply batchnorm-relu-conv-tanh at output
         return torch.tanh(self.output_layer(h))
-
 
 
 

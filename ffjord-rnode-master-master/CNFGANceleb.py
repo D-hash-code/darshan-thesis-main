@@ -1,26 +1,48 @@
 import argparse
 import os, sys
+import functools
 import warnings
 import pandas as pd
 import time
 import numpy as np
 import yaml, csv
 import shutil
+import math
 
 import torch
 import torch.backends.cudnn as cudnn
 import torch.distributed as distributed
 import torch.nn as nn
+from torch.nn import init
 import torch.optim as optim
+import torch.nn.functional as F
+from torch.nn import Parameter as P
 
 import torchvision.datasets as dset
 import torchvision.transforms as tforms
 from torchvision.utils import save_image
+from torchvision.datasets import ImageFolder
+
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms, utils
+from u_net.PyTorchDatasets import  Celeba
+
+import u_net.inception_utils as inception_utils
 
 import lib.layers as layers
 import lib.utils as utils
+import u_net.utils as unet_utils
 import lib.odenvp as odenvp
 from lib.datasets import CelebAHQ, Imagenet64
+
+from u_net.fid_score import calculate_fid_given_paths_or_tensor
+import pickle
+from matplotlib import pyplot as plt
+from u_net.mixup import CutMix
+import gc
+from types import ModuleType, FunctionType
+from gc import get_referents
+
 
 from train_misc import standard_normal_logprob
 from train_misc import set_cnf_options, count_nfe, count_parameters, count_total_time
@@ -31,105 +53,37 @@ import dist_utils
 from dist_utils import env_world_size, env_rank
 from torch.utils.data.distributed import DistributedSampler
 
-SOLVERS = ["dopri5", "bdf", "rk4", "midpoint", 'adams', 'explicit_adams', 'adaptive_heun', 'bosh3']
+#-----------------------------
 
-def get_parser():
-    parser = argparse.ArgumentParser("Continuous Normalizing Flow")
-    parser.add_argument("--datadir", default="./data/")
-    parser.add_argument("--nworkers", type=int, default=4)
-    parser.add_argument("--data", choices=["mnist", "svhn", "cifar10", 'lsun_church', 'celebahq', 'imagenet64'], 
-            type=str, default="mnist")
-    parser.add_argument("--dims", type=str, default="64,64,64")
-    parser.add_argument("--strides", type=str, default="1,1,1,1")
-    parser.add_argument("--num_blocks", type=int, default=26, help='Number of stacked CNFs.')
+# Custom objects know their class.
+# Function objects seem to know way too much, including modules.
+# Exclude modules as well.
+BLACKLIST = type, ModuleType, FunctionType
 
-    parser.add_argument(
-        "--layer_type", type=str, default="concat",
-        choices=["ignore", "concat"]
-    )
-    parser.add_argument("--divergence_fn", type=str, default="approximate", choices=["brute_force", "approximate"])
-    parser.add_argument(
-        "--nonlinearity", type=str, default="softplus", choices=["tanh", "relu", "softplus", "elu"]
-    )
-    parser.add_argument('--solver', type=str, default='rk4', choices=SOLVERS)
-    parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'sgd'])
-    parser.add_argument('--atol', type=float, default=1e-5, help='only for adaptive solvers')
-    parser.add_argument('--rtol', type=float, default=1e-5,  help='only for adaptive solvers')
-    parser.add_argument('--step_size', type=float, default=0.25, help='only for fixed step size solvers')
-    parser.add_argument('--first_step', type=float, default=0.166667, help='only for adaptive solvers')
+def getsize(obj):
+    """sum size of object & members."""
+    if isinstance(obj, BLACKLIST):
+        raise TypeError('getsize() does not take argument of type: '+ str(type(obj)))
+    seen_ids = set()
+    size = 0
+    objects = [obj]
+    while objects:
+        need_referents = []
+        for obj in objects:
+            if not isinstance(obj, BLACKLIST) and id(obj) not in seen_ids:
+                seen_ids.add(id(obj))
+                size += sys.getsizeof(obj)
+                need_referents.append(obj)
+        objects = get_referents(*need_referents)
+    return size
 
-    parser.add_argument('--test_solver', type=str, default='rk4', choices=SOLVERS + [None])
-    parser.add_argument('--test_atol', type=float, default=1e-5)
-    parser.add_argument('--test_rtol', type=float, default=1e-5)
-    parser.add_argument('--test_step_size', type=float, default=None)
-    parser.add_argument('--test_first_step', type=float, default=None)
+def find_between(s, start, end):
+    return (s.split(start))[1].split(end)[0]
 
-    parser.add_argument("--imagesize", type=int, default=None)
-    parser.add_argument("--alpha", type=float, default=1e-6)
-    parser.add_argument('--time_length', type=float, default=1.0)
-    parser.add_argument('--train_T', type=eval, default=False)
 
-    parser.add_argument("--num_epochs", type=int, default=20)
-    parser.add_argument("--batch_size", type=int, default=3)
-    parser.add_argument(
-        "--batch_size_schedule", type=str, default="", help="Increases the batchsize at every given epoch, dash separated."
-    )
-    parser.add_argument("--test_batch_size", type=int, default=3)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--warmup_iters", type=float, default=1000)
-    parser.add_argument("--weight_decay", type=float, default=0.)
-
-    parser.add_argument("--add_noise", type=eval, default=True, choices=[True, False])
-    parser.add_argument('--nbits', type=int, default=5)
-    parser.add_argument('--div_samples',type=int, default=1)
-    parser.add_argument('--squeeze_first', type=eval, default=False, choices=[True, False])
-    parser.add_argument('--zero_last', type=eval, default=True, choices=[True, False])
-    parser.add_argument('--seed', type=int, default=42)
-
-    # Regularizations
-    parser.add_argument('--kinetic-energy', type=float, default=0.01, help="int_t ||f||_2^2")
-    parser.add_argument('--jacobian-norm2', type=float, default=0.01, help="int_t ||df/dx||_F^2")
-    parser.add_argument('--total-deriv', type=float, default=None, help="int_t ||df/dt||^2")
-    parser.add_argument('--directional-penalty', type=float, default=None, help="int_t ||(df/dx)^T f||^2")
-
-    parser.add_argument(
-        "--max_grad_norm", type=float, default=np.inf,
-        help="Max norm of graidents"
-    )
-
-    parser.add_argument("--resume", type=str, default=None, help='path to saved check point')
-    parser.add_argument("--save", type=str, default="../experiments/celebahq/example/")
-    parser.add_argument("--val_freq", type=int, default=1)
-    parser.add_argument("--log_freq", type=int, default=1)
-    parser.add_argument('--validate', type=eval, default=False, choices=[True, False])
-
-    parser.add_argument('--distributed', action='store_true', help='Run distributed training. Default True')
-    parser.add_argument('--dist-url', default='env://', type=str,
-                        help='url used to set up distributed training')
-    parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
-    parser.add_argument('--local_rank', default=0, type=int,
-                        help='Used for multi-process training. Can either be manually set ' +
-                        'or automatically set by using \'python -m multiproc\'.')
-
-    #parser.add_argument('--skip-auto-shutdown', action='store_true',
-    #                    help='Shutdown instance at the end of training or failure')
-    #parser.add_argument('--auto-shutdown-success-delay-mins', default=10, type=int,
-    #                    help='how long to wait until shutting down on success')
-    #parser.add_argument('--auto-shutdown-failure-delay-mins', default=60, type=int,
-    #                    help='how long to wait before shutting down on error')
-
-    return parser
-
-cudnn.benchmark = True ##**
-args = get_parser().parse_args()
-torch.manual_seed(args.seed) 
-nvals = 2**args.nbits ##**
-
-##**
-# Only want master rank logging
-is_master = (not args.distributed) or (dist_utils.env_rank()==0)
-is_rank0 = args.local_rank == 0
-write_log = is_rank0 and is_master
+def requires_grad(model, flag=True):
+    for p in model.parameters():
+        p.requires_grad = flag
 
 
 def add_noise(x, nbits=8): ##** What datatype is x input?
@@ -256,10 +210,311 @@ def create_model(args, data_shape, regularization_fns):
     return model
 
 
-#if __name__ == "__main__":
-def main():
-    #os.system('shutdown -c')  # cancel previous shutdown command
 
+def run(config,args):
+
+    # Only want master rank logging
+    is_master = (not args.distributed) or (dist_utils.env_rank()==0)
+    is_rank0 = args.local_rank == 0
+    write_log = is_rank0 and is_master
+
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    nvals = 2**args.nbits
+
+    from u_net import train_fns
+
+    config['resolution'] = 128  ##utils.imsize_dict[config['dataset']]
+    print("RESOLUTION: ",config['resolution'])
+    config['n_classes'] = 1
+    config['G_activation'] = nn.ReLU(inplace=False) ##utils.activation_dict[config['G_nl']]
+    config['D_activation'] = nn.ReLU(inplace=False) ##utils.activation_dict[config['D_nl']]
+    # By default, skip init if resuming training.
+    if config['resume']:
+        print('Skipping initialization for training resumption...')
+        config['skip_init'] = True
+    config = unet_utils.update_config_roots(config)
+    device = 'cuda'
+
+    # Prepare root folders if necessary
+    unet_utils.prepare_root(config)
+
+    # Import the model--this line allows us to dynamically select different files.
+    model = __import__(config['model'])
+    experiment_name = (config['experiment_name'] if config['experiment_name']
+                       else unet_utils.name_from_config(config))
+    print('Experiment name is %s' % experiment_name)
+    print("::: weights saved at ", '/'.join([config['weights_root'],experiment_name]) )
+
+
+    # Next, build the model
+    keys = sorted(config.keys())
+    for k in keys:
+        print(k, ": ", config[k])
+
+    #-----------------------------------------------------------------------------
+    G = model.Generator(**config).to(device)
+    #=============================================================================
+
+    D = model.Unet_Discriminator(**config).to(device)
+
+    G_ema, ema = None, None
+
+    GD = model.G_D(G, D, config)
+
+    print(G)
+    print(D)
+    print('Number of params in G: {} D: {}'.format(
+    *[sum([p.data.nelement() for p in net.parameters()]) for net in [G,D]]))
+
+    # Prepare noise and randomly sampled label arrays Allow for different batch sizes in G
+    G_batch_size = max(config['G_batch_size'], config['batch_size'])
+    G_batch_size = int(G_batch_size*config["num_G_accumulations"])
+
+    z_, y_ = unet_utils.prepare_z_y(G_batch_size, G.dim_z, device=device)
+    
+    state_dict = {'itr': 0, 'epoch': 0, 'save_num': 0, 'save_best_num': 0,
+                'best_IS': 0,'best_FID': 999999,'config': config}
+    
+    if config['parallel']:
+        GD = nn.DataParallel(GD)
+
+    if config['resume']:
+        print('Loading weights...')
+        if config["epoch_id"] !="":
+            epoch_id = config["epoch_id"]
+
+        try:
+            print("LOADING EMA")
+            unet_utils.load_weights(G, D, state_dict,
+                            config['weights_root'], experiment_name, config, epoch_id,
+                            config['load_weights'] if config['load_weights'] else None,
+                            G_ema if config['ema'] else None)
+        except:
+            print("Ema weight wasn't found, copying G weights to G_ema instead")
+            unet_utils.load_weights(G, D, state_dict,
+                            config['weights_root'], experiment_name, config, epoch_id,
+                            config['load_weights'] if config['load_weights'] else None,
+                             None)
+            G_ema.load_state_dict(G.state_dict())
+
+        print("loaded weigths")
+
+    if config["dataset"]=="celeba128":
+        root =  config["data_folder"] #
+        root_perm =  config["data_folder"]
+        transform = transforms.Compose(
+            [
+                transforms.Scale(config["resolution"]),
+                transforms.CenterCrop(config["resolution"]),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+            ]
+        )
+
+        batch_size = config['batch_size']
+        dataset = Celeba(root = root, transform = transform, batch_size = batch_size*config["num_D_accumulations"], imsize = config["resolution"])
+        data_loader = DataLoader(dataset, batch_size, shuffle = True, drop_last = True)
+        loaders = [data_loader]
+
+
+    print("Loaded ", config["dataset"])
+    inception_metrics_dict = {"fid":[],"is_mean": [], "is_std": []}
+
+
+    # Prepare inception metrics: FID and IS
+    get_inception_metrics = inception_utils.prepare_inception_metrics(config['dataset'],config['parallel'], config['no_fid'], use_torch=False)
+
+    # Prepare data; the Discriminator's batch size is all that needs to be passed to the dataloader, as G doesn't require dataloading. Note
+    # that at every loader iteration we pass in enough data to complete a full D iteration (regardless of number of D steps and accumulations)
+    D_batch_size = (config['batch_size'] * config['num_D_steps'] * config['num_D_accumulations'])
+
+    # Prepare a fixed z & y to see individual sample evolution throghout training
+    fixed_z, fixed_y = unet_utils.prepare_z_y(G_batch_size, G.dim_z, device=device)
+    fixed_z.sample_()
+    fixed_y.sample_()
+
+    # Loaders are loaded, prepare the training function
+    if config['which_train_fn'] == 'GAN':
+        train = train_fns.GAN_training_function(G, D, GD, z_, y_,
+                                                ema, state_dict, config)
+    # Else, assume debugging and use the dummy train fn
+    else:
+        train = train_fns.dummy_training_function()
+
+    # Prepare Sample function for use with inception metrics
+    sample = functools.partial(unet_utils.sample,
+                          G=(G_ema if config['ema'] and config['use_ema']
+                             else G),
+                          z_=z_, y_=y_, config=config)
+
+    if config["debug"]:
+        loss_steps = 10
+    else:
+        loss_steps = 100
+
+    print('Beginning training at epoch %d...' % state_dict['epoch'])
+
+
+    # Train for specified number of epochs, although we mostly track G iterations.
+    warmup_epochs = config["warmup_epochs"]
+
+
+    for epoch in range(state_dict['epoch'], config['num_epochs']):
+        if config["progress_bar"]:
+            if config['pbar'] == 'mine':
+                pbar = unet_utils.progress(loaders[0],displaytype='s1k' if config['use_multiepoch_sampler'] else 'eta')
+            else:
+                pbar = tqdm(loaders[0])
+        else:
+            pbar = loaders[0]
+
+        target_map = None
+
+
+
+        for i, batch_data in enumerate(pbar):
+            x = batch_data[0]
+            y = batch_data[1]
+            #H = batch_data[2]
+
+            # Increment the iteration counter
+            state_dict['itr'] += 1
+            if config["debug"] and state_dict['itr']>config["stop_it"]:
+                print("code didn't break :)")
+                break
+            # Make sure G and D are in training mode, just in case they got set to eval For D, which typically doesn't have BN, this shouldn't
+            # matter much.
+            G.train()
+            D.train()
+            if config['ema']:
+                G_ema.train()
+            
+            x, y = x.to(device), y.to(device).view(-1)
+            x.requires_grad = False
+            y.requires_grad = False
+
+            if config["unet_mixup"]:
+                # Here we load cutmix masks for every image in the batch
+                n_mixed = int(x.size(0)/config["num_D_accumulations"])
+                target_map = torch.cat([CutMix(config["resolution"]).cuda().view(1,1,config["resolution"],config["resolution"]) for _ in range(n_mixed) ],dim=0)
+
+
+            if config["slow_mixup"] and config["full_batch_mixup"]:
+                # r_mixup is the chance that we select a mixed batch instead of
+                # a normal batch. This only happens in the setting full_batch_mixup.
+                # Otherwise the mixed loss is calculated on top of the normal batch.
+                r_mixup = 0.5 * min(1.0, state_dict["epoch"]/warmup_epochs) # r is at most 50%, after reaching warmup_epochs
+            elif not config["slow_mixup"] and config["full_batch_mixup"]:
+                r_mixup = 0.5
+            else:
+                r_mixup = 0.0
+
+            metrics = train(x, y, state_dict["epoch"], batch_size , target_map = target_map, r_mixup = r_mixup)
+
+
+            if (i+1)%200==0:
+                # print this just to have some peace of mind that the model is training
+                print("alive and well at ", state_dict['itr'])
+
+            if (i+1)%20==0:
+                #try:
+                train_log.log(itr=int(state_dict['itr']), **metrics)
+                #except:
+                #    print("ouch")
+            
+            # Every sv_log_interval, log singular values
+            if (config['sv_log_interval'] > 0) and (not (state_dict['itr'] % config['sv_log_interval'])):
+
+                train_log.log(itr=int(state_dict['itr']),
+                             **{**unet_utils.get_SVs(G, 'G'), **unet_utils.get_SVs(D, 'D')})
+
+          
+            # Save weights and copies as configured at specified interval
+            if not (state_dict['itr'] % config['save_every']):
+
+                if config['G_eval_mode']:
+                    print('Switchin G to eval mode...')
+                    G.eval()
+                    if config['ema']:
+                        G_ema.eval()
+                    train_fns.save_and_sample(G, D, G_ema, z_, y_, fixed_z, fixed_y,
+                                      state_dict, config, experiment_name, sample_only=False)
+            
+            go_ahead_and_sample = (not (state_dict['itr'] % config['sample_every']) ) or ( state_dict['itr']<1001 and not (state_dict['itr'] % 100) )
+
+            if go_ahead_and_sample:
+
+                if config['G_eval_mode']:
+                    print('Switchin G to eval mode...')
+                    G.eval()
+                    if config['ema']:
+                        G_ema.eval()
+
+                    train_fns.save_and_sample(G, D, G_ema, z_, y_, fixed_z, fixed_y,
+                                      state_dict, config, experiment_name, sample_only=True)
+
+
+                    with torch.no_grad():
+                        real_batch = dataset.fixed_batch()
+                    train_fns.save_and_sample(G, D, G_ema, z_, y_, fixed_z, fixed_y,
+                                      state_dict, config, experiment_name, sample_only=True, use_real = True, real_batch = real_batch)
+                    
+                    # also, visualize mixed images and the decoder predicitions
+                    if config["unet_mixup"]:
+                        with torch.no_grad():
+
+                            n = int(min(target_map.size(0), fixed_z.size(0)/2))
+                            which_G = G_ema if config['ema'] and config['use_ema'] else G
+                            unet_utils.accumulate_standing_stats(G_ema if config['ema'] and config['use_ema'] else G,
+                                                                         z_, y_, config['n_classes'],
+                                                                         config['num_standing_accumulations'])
+
+                            real_batch = dataset.fixed_batch()
+                            fixed_Gz = nn.parallel.data_parallel(which_G, (fixed_z[:n], which_G.shared(fixed_z[:n]))) #####shouldnt that be fixed_y?
+
+                            mixed = target_map[:n]*real_batch[:n]+(1-target_map[:n])*fixed_Gz
+                            train_fns.save_and_sample(G, D, G_ema, z_[:n], y_[:n], fixed_z[:n], fixed_y[:n],
+                                        state_dict, config, experiment_name+"_mix", sample_only=True, use_real = True, real_batch = mixed, mixed=True, target_map = target_map[:n])
+          
+            # Test every specified interval
+            if not (state_dict['itr'] % config['test_every']):
+            #if state_dict['itr'] % 100 == 0:
+                if config['G_eval_mode']:
+                  print('Switchin G to eval mode...')
+
+                is_mean, is_std , fid = train_fns.test(G, D, G_ema, z_, y_, state_dict, config, sample, get_inception_metrics , experiment_name, test_log, moments = "train")
+                ###
+                #  Here, the bn statistics are updated
+                ###
+                if  config['accumulate_stats']:
+                    print("accumulate stats")
+                    unet_utils.accumulate_standing_stats(G_ema if config['ema'] and config['use_ema'] else G,
+                                                                 z_, y_, config['n_classes'], config['num_standing_accumulations'])
+
+                inception_metrics_dict["is_mean"].append((state_dict['itr'] , is_mean ) )
+                inception_metrics_dict["is_std"].append((state_dict['itr'] , is_std ) )
+                inception_metrics_dict["fid"].append((state_dict['itr'] , fid ) )
+
+            if (i + 1) % loss_steps == 0:
+                with open(os.path.join(config["base_root"],"logs/inception_metrics_"+config["random_number_string"]+".p"), "wb") as h:
+                    pickle.dump(inception_metrics_dict,h)
+                    print("saved FID and IS at", os.path.join(config["base_root"],"logs/inception_metrics_"+config["random_number_string"]+".p") )
+
+
+        # Increment epoch counter at end of epoch
+        state_dict['epoch'] += 1
+
+
+
+
+
+
+    #-----------------------------------------------------------------------------------
+
+'''
     if write_log:
         utils.makedirs(args.save)
         logger = utils.get_logger(logpath=os.path.join(args.save, 'logs'), filepath=os.path.abspath(__file__))
@@ -546,15 +801,63 @@ def main():
             if args.validate:
                 break
 
+'''
+
+def main():
+    parser = unet_utils.prepare_parser()
+    config = vars(parser.parse_args())
+    cudnn.benchmark = True ##**
+    args = parser.parse_args()
+
+    
+
+    if config["gpus"] !="":
+        os.environ["CUDA_VISIBLE_DEVICES"] = config["gpus"]
+    random_number_string = str(int(np.random.rand()*1000000)) + "_" + config["id"]
+    config["stop_it"] = 99999999999999
+
+
+    if config["debug"]:
+        config["save_every"] = 30
+        config["sample_every"] = 20
+        config["test_every"] = 20
+        config["num_epochs"] = 1
+        config["stop_it"] = 35
+        config["slow_mixup"] = False
+
+    config["num_gpus"] = len(config["gpus"].replace(",",""))
+
+    config["random_number_string"] = random_number_string
+    new_root = os.path.join(config["base_root"],random_number_string)
+    if not os.path.isdir(new_root):
+        os.makedirs(new_root)
+        os.makedirs(os.path.join(new_root, "samples"))
+        os.makedirs(os.path.join(new_root, "weights"))
+        os.makedirs(os.path.join(new_root, "data"))
+        os.makedirs(os.path.join(new_root, "logs"))
+        print("created ", new_root)
+    config["base_root"] = new_root
+
+
+    keys = sorted(config.keys())
+    print("config")
+    for k in keys:
+        print(str(k).ljust(30,"."), config[k] )
+
+    run(config,args)
+
+    ## try:
+    ##     with warnings.catch_warnings():
+    ##         warnings.simplefilter("ignore", category=UserWarning)
+    ##         main()
+    ##     #if not args.skip_auto_shutdown: os.system(f'sudo shutdown -h -P +{args.auto_shutdown_success_delay_mins}')
+    ## except Exception as e:
+    ##     exc_type, exc_value, exc_traceback = sys.exc_info()
+    ##     import traceback
+    ##     traceback.print_tb(exc_traceback, file=sys.stdout)
+    ##     # in case of exception, wait 2 hours before shutting down
+    ##     #if not args.skip_auto_shutdown: os.system(f'sudo shutdown -h -P +{args.auto_shutdown_failure_delay_mins}')
+
+
 if __name__ == '__main__':
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=UserWarning)
-            main()
-        #if not args.skip_auto_shutdown: os.system(f'sudo shutdown -h -P +{args.auto_shutdown_success_delay_mins}')
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        import traceback
-        traceback.print_tb(exc_traceback, file=sys.stdout)
-        # in case of exception, wait 2 hours before shutting down
-        #if not args.skip_auto_shutdown: os.system(f'sudo shutdown -h -P +{args.auto_shutdown_failure_delay_mins}')
+    main()
