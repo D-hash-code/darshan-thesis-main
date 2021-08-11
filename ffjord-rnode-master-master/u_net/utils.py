@@ -81,7 +81,7 @@ def prepare_parser():
 
   ### Model stuff ###
   parser.add_argument(
-    '--model', type=str, default='u_net/unet_d',
+    '--model', type=str, default='unet_d',
     help='Name of the model module (default: %(default)s)')
   parser.add_argument(
     '--G_param', type=str, default='SN',
@@ -185,7 +185,7 @@ def prepare_parser():
 
   ### Batch size, parallel, and precision stuff ###
   parser.add_argument(
-    '--batch_size', type=int, default=5,
+    '--batch_size', type=int, default=3,
     help='Default overall batchsize (default: %(default)s)')
   parser.add_argument(
     '--G_batch_size', type=int, default=0,
