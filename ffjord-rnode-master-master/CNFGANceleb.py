@@ -907,5 +907,14 @@ def main():
     ##     #if not args.skip_auto_shutdown: os.system(f'sudo shutdown -h -P +{args.auto_shutdown_failure_delay_mins}')
 
 
+
 if __name__ == '__main__':
-    main()
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+            main()
+        #if not args.skip_auto_shutdown: os.system(f'sudo shutdown -h -P +{args.auto_shutdown_success_delay_mins}')
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        import traceback
+        traceback.print_tb(exc_traceback, file=sys.stdout)
