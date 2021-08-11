@@ -5,6 +5,7 @@ import pickle
 import torch
 import random
 import torchvision
+from typing import Optional
 
 from torchvision.datasets.vision import VisionDataset
 from torchvision import datasets, transforms, utils

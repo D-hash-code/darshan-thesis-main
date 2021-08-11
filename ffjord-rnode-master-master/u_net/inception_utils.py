@@ -21,6 +21,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter as P
 from torchvision.models.inception import inception_v3
+from u_net import celeba128_inception_moments
 
 
 # Module that wraps the inception network to enable use with dataparallel and
