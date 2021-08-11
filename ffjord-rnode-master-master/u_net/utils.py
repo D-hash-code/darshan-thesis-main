@@ -261,7 +261,7 @@ def prepare_parser():
     help='Number of samples to compute inception metrics with '
          '(default: %(default)s)')
   parser.add_argument(
-    '--hashname', action='store_true', default=False,
+    '--hashname', type=bool, default=True,
     help='Use a hash of the experiment name instead of the full config '
          '(default: %(default)s)')
   parser.add_argument(
@@ -386,7 +386,7 @@ def prepare_parser():
 
   parser.add_argument("--dims", type=str, default="64,64,64")
   parser.add_argument("--strides", type=str, default="1,1,1,1")
-  parser.add_argument("--num_blocks", type=int, default=26, help='Number of stacked CNFs.')
+  parser.add_argument("--num_blocks", type=int, default=3, help='Number of stacked CNFs.')
 
   parser.add_argument(
       "--layer_type", type=str, default="concat",
