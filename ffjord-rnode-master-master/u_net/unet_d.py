@@ -368,7 +368,7 @@ class Generator(nn.Module):
         self.div_samples=args.div_samples
         self.nonlinearity = args.nonlinearity
         self.strides=strides
-        #self.squash_input = args.squash_input
+        self.squash_input = True
         self.alpha = args.alpha
         self.squeeze_first = args.squeeze_first
         self.cnf_kwargs = {}
