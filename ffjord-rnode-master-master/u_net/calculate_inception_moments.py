@@ -17,8 +17,7 @@ import inception_utils
 from tqdm import tqdm, trange
 from argparse import ArgumentParser
 from torchvision import datasets, transforms, utils
-from PyTorchDatasets import CocoAnimals3  as CocoAnimals
-from PyTorchDatasets import FFHQ, LSUN, CelebaHQ, Celeba
+from u_net.PyTorchDatasets import FFHQ, LSUN, CelebaHQ, Celeba
 from torch.utils.data import DataLoader
 
 def prepare_parser():

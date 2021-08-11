@@ -11,8 +11,8 @@ import torchvision
 import os
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
-import utils
-import losses
+import u_net.utils as utils
+import u_net.losses as losses
 from PIL import Image
 import numpy as np
 import functools

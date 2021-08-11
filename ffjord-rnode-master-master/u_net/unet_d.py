@@ -12,7 +12,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.nn import Parameter as P
 
-import layers
+import u_net.layers as layers
 import lib.odenvp as odenvp
 
 import copy
