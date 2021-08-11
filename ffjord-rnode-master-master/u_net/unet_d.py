@@ -387,7 +387,7 @@ class Generator(nn.Module):
         #self.lr, self.B1, self.B2, self.adam_eps = G_lr, G_B1, G_B2, adam_eps
 
         self.optim = optim.Adam(params=self.parameters(), lr=config['G_lr'],
-                                                    betas=(config['B1'], config['B2']), weight_decay=0,
+                                                    betas=(config['G_B1'], config['G_B2']), weight_decay=0,
                                                     eps=config['adam_eps'])
 
     def _build_net(self, input_size):
