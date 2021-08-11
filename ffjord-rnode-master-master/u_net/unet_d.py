@@ -360,7 +360,7 @@ class Generator(nn.Module):
             bsz, c, w, h = input_size
             c, w, h = c*4, w//2, h//2
             input_size = bsz, c, w, h
-        self.n_scale = min(args.n_scale, self._calc_n_scale(input_size))
+        self.n_scale = self._calc_n_scale(input_size) #min(args.n_scale, self._calc_n_scale(input_size))
         self.n_blocks = args.num_blocks
         self.intermediate_dims = hidden_dims
         self.layer_type=args.layer_type
