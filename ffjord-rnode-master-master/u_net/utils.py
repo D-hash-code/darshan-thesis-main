@@ -54,7 +54,7 @@ def prepare_parser():
   parser.add_argument("--display_mixed_batch", action="store_true", default = False)
   ### Dataset/Dataloader stuff ###
   parser.add_argument(
-    '--dataset', type=str, default='celeb128',
+    '--dataset', type=str, default='celeba128',
     help='Which Dataset to train on, out of I128, I256, C10, C100;'
          'Append "_hdf5" to use the hdf5 version for ISLVRC '
          '(default: %(default)s)')
