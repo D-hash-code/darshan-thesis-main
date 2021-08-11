@@ -24,7 +24,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
-import datasets as dset
+import u_net.datasets as dset
 
 
 def prepare_parser():
