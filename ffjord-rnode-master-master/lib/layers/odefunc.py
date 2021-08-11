@@ -288,6 +288,7 @@ class ODEfunc(nn.Module):
         self.residual = residual
         self.rademacher = rademacher
         self.div_samples = div_samples
+        self.density=False
 
         if divergence_fn == "brute_force":
             self.divergence_fn = divergence_bf
@@ -305,41 +306,60 @@ class ODEfunc(nn.Module):
         return self._num_evals.item()
 
     def forward(self, t, states):
-        assert len(states) >= 2
-        y = states[0]
+        if self.density:
+            assert len(states) >= 2
+            y = states[0]
+
+            # increment num evals
+            self._num_evals += 1
+
+            # convert to tensor
+            #t = torch.tensor(t).type_as(y)
+            batchsize = y.shape[0]
+
+            # Sample and fix the noise.
+            if self._e is None:
+                if self.rademacher:
+                    self._e = [sample_rademacher_like(y) for k in range(self.div_samples)]
+                else:
+                    self._e = [sample_gaussian_like(y) for k in range(self.div_samples)]
+
+            with torch.set_grad_enabled(True):
+                y.requires_grad_(True)
+                t.requires_grad_(True)
+                for s_ in states[2:]:
+                    s_.requires_grad_(True)
+                dy = self.diffeq(t, y, *states[2:])
+                # Hack for 2D data to use brute force divergence computation.
+                if not self.training and dy.view(dy.shape[0], -1).shape[1] == 2:
+                    divergence = divergence_bf(dy, y).view(batchsize, 1)
+                else:
+                    divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
+                    divergence = divergence.view(batchsize, 1)
+                self.sqjacnorm = sqjacnorm
+            if self.residual:
+                dy = dy - y
+                divergence -= torch.ones_like(divergence) * torch.tensor(np.prod(y.shape[1:]), dtype=torch.float32
+                                                                        ).to(divergence)
+            return tuple([dy, -divergence] + [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]])
+        
+
+        y = states
 
         # increment num evals
         self._num_evals += 1
 
         # convert to tensor
         #t = torch.tensor(t).type_as(y)
-        batchsize = y.shape[0]
-
-        # Sample and fix the noise.
-        if self._e is None:
-            if self.rademacher:
-                self._e = [sample_rademacher_like(y) for k in range(self.div_samples)]
-            else:
-                self._e = [sample_gaussian_like(y) for k in range(self.div_samples)]
 
         with torch.set_grad_enabled(True):
             y.requires_grad_(True)
             t.requires_grad_(True)
-            for s_ in states[2:]:
-                s_.requires_grad_(True)
-            dy = self.diffeq(t, y, *states[2:])
-            # Hack for 2D data to use brute force divergence computation.
-            if not self.training and dy.view(dy.shape[0], -1).shape[1] == 2:
-                divergence = divergence_bf(dy, y).view(batchsize, 1)
-            else:
-                divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
-                divergence = divergence.view(batchsize, 1)
-            self.sqjacnorm = sqjacnorm
-        if self.residual:
-            dy = dy - y
-            divergence -= torch.ones_like(divergence) * torch.tensor(np.prod(y.shape[1:]), dtype=torch.float32
-                                                                     ).to(divergence)
-        return tuple([dy, -divergence] + [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]])
+
+            dy = self.diffeq(t, y)
+
+        return tuple(dy)
+
 
 
 class AutoencoderODEfunc(nn.Module):

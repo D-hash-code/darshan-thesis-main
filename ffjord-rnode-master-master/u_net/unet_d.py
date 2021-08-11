@@ -13,9 +13,16 @@ import torch.nn.functional as F
 from torch.nn import Parameter as P
 
 import layers
+import lib.odenvp as odenvp
 
 import copy
 from matplotlib import pyplot as plt
+
+
+import lib.layers as ODElayers
+from lib.layers.odefunc import ODEnet
+from lib.layers.squeeze import squeeze, unsqueeze
+import numpy as np
 
 
 from torch.optim.optimizer import Optimizer
@@ -325,248 +332,194 @@ class Unet_Discriminator(nn.Module):
         return out, bottleneck_out
 
 
-# Architectures for G
-# Attention is passed in in the format '32_64' to mean applying an attention
-# block at both resolution 32x32 and 64x64.
-def G_arch(ch=64, attention='64', ksize='333333', dilation='111111'):
-    arch = {}
 
-    arch[256] = {'in_channels' :    [ch * item for item in [16, 16, 8, 8, 4, 2]],
-                             'out_channels' : [ch * item for item in [16,    8, 8, 4, 2, 1]],
-                             'upsample' : [True] * 6,
-                             'resolution' : [8, 16, 32, 64, 128, 256],
-                             'attention' : {2**i: (2**i in [int(item) for item in attention.split('_')])
-                                                            for i in range(3,9)}}
-    arch[128] = {'in_channels' :    [ch * item for item in [16, 16, 8, 4, 2]],
-                             'out_channels' : [ch * item for item in [16, 8, 4, 2, 1]],
-                             'upsample' : [True] * 5,
-                             'resolution' : [8, 16, 32, 64, 128],
-                             'attention' : {2**i: (2**i in [int(item) for item in attention.split('_')])
-                                                            for i in range(3,8)}}
-    return arch
-
-
-## Turn into container class for CNF
 class Generator(nn.Module):
-    def __init__(self, G_ch=64, dim_z=128, bottom_width=4, resolution=128,
-                             G_kernel_size=3, G_attn='64', n_classes=1000,
-                             num_G_SVs=1, num_G_SV_itrs=1,
-                             G_shared=True, shared_dim=0, hier=False,
-                             cross_replica=False, mybn=False,
-                             G_activation=nn.ReLU(inplace=False),
-                             G_lr=5e-5, G_B1=0.0, G_B2=0.999, adam_eps=1e-8,
-                             BN_eps=1e-5, SN_eps=1e-12, G_mixed_precision=False, G_fp16=False,
-                             G_init='ortho', skip_init=False, no_optim=False,
-                             G_param='SN', norm_style='bn',
-                             **kwargs):
+    """
+    Real NVP for image data. Will downsample the input until one of the
+    dimensions is less than or equal to 4.
+
+    Args:
+        input_size (tuple): 4D tuple of the input size.
+        n_scale (int): Number of scales for the representation z.
+        n_resblocks (int): Length of the resnet for each coupling layer.
+    """
+
+    def __init__(self, args, config,G_lr=5e-5, G_B1=0.0, G_B2=0.999, adam_eps=1e-8):
         super(Generator, self).__init__()
-        # Channel width mulitplier
-        self.ch = G_ch
-        # Dimensionality of the latent space
-        self.dim_z = dim_z
-        # The initial spatial dimensions
-        self.bottom_width = bottom_width
-        # Resolution of the output
-        self.resolution = resolution
-        # Kernel size?
-        self.kernel_size = G_kernel_size
-        # Attention?
-        self.attention = G_attn
-        # number of classes, for use in categorical conditional generation
-        self.n_classes = n_classes
-        # Use shared embeddings?
-        self.G_shared = G_shared
-        # Dimensionality of the shared embedding? Unused if not using G_shared
-        self.shared_dim = shared_dim if shared_dim > 0 else dim_z
-        # Hierarchical latent space?
-        self.hier = hier
-        # Cross replica batchnorm?
-        self.cross_replica = cross_replica
-        # Use my batchnorm?
-        self.mybn = mybn
-        # nonlinearity for residual blocks
-        self.activation = G_activation
-        # Initialization style
-        self.init = G_init
-        # Parameterization style
-        self.G_param = G_param
-        # Normalization style
-        self.norm_style = norm_style
-        # Epsilon for BatchNorm?
-        self.BN_eps = BN_eps
-        # Epsilon for Spectral Norm?
-        self.SN_eps = SN_eps
-        # fp16?
-        self.fp16 = G_fp16
-        # Architecture dict
-        self.arch = G_arch(self.ch, self.attention)[resolution]
 
-        self.unconditional = kwargs["unconditional"]
-
-        # If using hierarchical latents, adjust z
-        if self.hier:
-            # Number of places z slots into
-            self.num_slots = len(self.arch['in_channels']) + 1
-            self.z_chunk_size = (self.dim_z // self.num_slots)
-
-            if not self.unconditional:
-                self.dim_z = self.z_chunk_size *    self.num_slots
-        else:
-            self.num_slots = 1
-            self.z_chunk_size = 0
-
-        # Which convs, batchnorms, and linear layers to use
-        if self.G_param == 'SN':
-            self.which_conv = functools.partial(layers.SNConv2d,
-                                                    kernel_size=3, padding=1,
-                                                    num_svs=num_G_SVs, num_itrs=num_G_SV_itrs,
-                                                    eps=self.SN_eps)
-            self.which_linear = functools.partial(layers.SNLinear,
-                                                    num_svs=num_G_SVs, num_itrs=num_G_SV_itrs,
-                                                    eps=self.SN_eps)
-        else:
-            self.which_conv = functools.partial(nn.Conv2d, kernel_size=3, padding=1)
-            self.which_linear = nn.Linear
-
-        # We use a non-spectral-normed embedding here regardless;
-        # For some reason applying SN to G's embedding seems to randomly cripple G
-        self.which_embedding = nn.Embedding
-
-        if self.unconditional:
-            bn_linear = nn.Linear
-            input_size =  self.dim_z  + (self.shared_dim if self.G_shared else 0 )
-
-        self.which_bn = functools.partial(layers.ccbn,
-                                                    which_linear=bn_linear,
-                                                    cross_replica=self.cross_replica,
-                                                    mybn=self.mybn,
-                                                    input_size=input_size,
-                                                    norm_style=self.norm_style,
-                                                    eps=self.BN_eps,
-                                                    self_modulation = self.unconditional)
+        
+        hidden_dims = tuple(map(int, args.dims.split(",")))
+        strides = tuple(map(int, args.strides.split(",")))
+        
+        data_shape=(3,128,128)
+        input_size = (args.batch_size, *data_shape)
+        squeeze_first=args.squeeze_first
 
 
-        # Prepare model
-        # If not using shared embeddings, self.shared is just a passthrough
-        self.shared = (self.which_embedding(n_classes, self.shared_dim) if G_shared
-                                        else layers.identity())
-        # First linear layer
-        if self.unconditional:
-            self.linear = self.which_linear(self.dim_z, self.arch['in_channels'][0] * (self.bottom_width **2))
-        else:
-            self.linear = self.which_linear(self.dim_z // self.num_slots,
-                                                                        self.arch['in_channels'][0] * (self.bottom_width **2))
+        if squeeze_first:
+            bsz, c, w, h = input_size
+            c, w, h = c*4, w//2, h//2
+            input_size = bsz, c, w, h
+        self.n_scale = min(args.n_scale, self._calc_n_scale(input_size))
+        self.n_blocks = args.num_blocks
+        self.intermediate_dims = hidden_dims
+        self.layer_type=args.layer_type
+        self.zero_last=args.zero_last
+        self.div_samples=args.div_samples
+        self.nonlinearity = args.nonlinearity
+        self.strides=strides
+        self.squash_input = args.squash_input
+        self.alpha = args.alpha
+        self.squeeze_first = args.squeeze_first
+        self.cnf_kwargs = {}
 
-        # self.blocks is a doubly-nested list of modules, the outer loop intended
-        # to be over blocks at a given resolution (resblocks and/or self-attention)
-        # while the inner loop is over a given block
-        self.blocks = []
-        for index in range(len(self.arch['out_channels'])):
+        self.dim_z = 128
+        self.resolution = 128
+        self.unconditional = True
 
+        if not self.n_scale > 0:
+            raise ValueError('Could not compute number of scales for input of' 'size (%d,%d,%d,%d)' % input_size)
 
-            self.blocks += [[layers.GBlock(in_channels=self.arch['in_channels'][index],
-                                                     out_channels=self.arch['out_channels'][index],
-                                                     which_conv=self.which_conv,
-						                             which_bn=self.which_bn,
-                                                     activation=self.activation,
-                                                     upsample=(functools.partial(F.interpolate, scale_factor=2)
-                                                                         if self.arch['upsample'][index] else None))]]
+        self.transforms = self._build_net(input_size)
 
-            # If attention on this block, attach it to the end
-            if self.arch['attention'][self.arch['resolution'][index]]:
-                print('Adding attention layer in G at resolution %d' % self.arch['resolution'][index])
-                self.blocks[-1] += [layers.Attention(self.arch['out_channels'][index], self.which_conv)]
+        self.dims = [o[1:] for o in self.calc_output_size(input_size)]
 
-        # Turn self.blocks into a ModuleList so that it's all properly registered.
-        self.blocks = nn.ModuleList([nn.ModuleList(block) for block in self.blocks])
-
-        # output layer: batchnorm-relu-conv.
-        # Consider using a non-spectral conv here
-        self.output_layer = nn.Sequential(layers.bn(self.arch['out_channels'][-1],
-                                                                                                cross_replica=self.cross_replica,
-                                                                                                mybn=self.mybn),
-                                                                        self.activation,
-                                                                        self.which_conv(self.arch['out_channels'][-1], 3))
-
-        # Initialize weights. Optionally skip init for testing.
-        if not skip_init:
-            self.init_weights()
-
-        # Set up optimizer
-        # If this is an EMA copy, no need for an optim, so just return now
-        if no_optim:
-            return
         self.lr, self.B1, self.B2, self.adam_eps = G_lr, G_B1, G_B2, adam_eps
-        if G_mixed_precision:
-            print('Using fp16 adam in G...')
-            import utils
-            self.optim = utils.Adam16(params=self.parameters(), lr=self.lr,
-                                                     betas=(self.B1, self.B2), weight_decay=0,
-                                                     eps=self.adam_eps)
-        else:
-            self.optim = optim.Adam(params=self.parameters(), lr=self.lr,
-                                                     betas=(self.B1, self.B2), weight_decay=0,
-                                                     eps=self.adam_eps)
 
-        # LR scheduling, left here for forward compatibility
-        # self.lr_sched = {'itr' : 0}# if self.progressive else {}
-        # self.j = 0
+        self.optim = optim.Adam(params=self.parameters(), lr=self.lr,
+                                                    betas=(self.B1, self.B2), weight_decay=0,
+                                                    eps=self.adam_eps)
 
-    # Initialize
-    def init_weights(self):
-        self.param_count = 0
-        for module in self.modules():
-            if (isinstance(module, nn.Conv2d)
-                    or isinstance(module, nn.Linear)
-                    or isinstance(module, nn.Embedding)):
-                if self.init == 'ortho':
-                    init.orthogonal_(module.weight)
-                elif self.init == 'N02':
-                    init.normal_(module.weight, 0, 0.02)
-                elif self.init in ['glorot', 'xavier']:
-                    init.xavier_uniform_(module.weight)
-                else:
-                    print('Init style not recognized...')
-                self.param_count += sum([p.data.nelement() for p in module.parameters()])
-        print('Param count for G''s initialized parameters: %d' % self.param_count)
+    def _build_net(self, input_size):
+        _, c, h, w = input_size
+        transforms = []
+        for i in range(self.n_scale):
+            transforms.append(
+                StackedCNFLayers(
+                    initial_size=(c, h, w),
+                    div_samples=self.div_samples,
+                    zero_last=self.zero_last,
+                    layer_type=self.layer_type,
+                    strides=self.strides,
+                    idims=self.intermediate_dims,
+                    squeeze=(i < self.n_scale - 1),  # don't squeeze last layer
+                    init_layer=(ODElayers.LogitTransform(self.alpha) if self.alpha > 0 else ODElayers.ZeroMeanTransform())
+                    if self.squash_input and i == 0 else None,
+                    n_blocks=self.n_blocks,
+                    cnf_kwargs=self.cnf_kwargs,
+                    nonlinearity=self.nonlinearity,
+                )
+            )
+            c, h, w = c * 2, h // 2, w // 2
+        return nn.ModuleList(transforms)
 
-    # Note on this forward function: we pass in a y vector which has
-    # already been passed through G.shared to enable easy class-wise
-    # interpolation later. If we passed in the one-hot and then ran it through
-    # G.shared in this forward function, it would be harder to handle.
-    def forward(self, z, y ):
-        # If hierarchical, concatenate zs and ys
-        if self.hier:
-            # faces
-            if self.unconditional:
-                ys = [z for _ in range(self.num_slots)]
+
+    def _calc_n_scale(self, input_size):
+        _, _, h, w = input_size
+        n_scale = 0
+        while h >= 4 and w >= 4:
+            n_scale += 1
+            h = h // 2
+            w = w // 2
+        return n_scale
+
+    def calc_output_size(self, input_size):
+        n, c, h, w = input_size
+        output_sizes = []
+        for i in range(self.n_scale):
+            if i < self.n_scale - 1:
+                c *= 2
+                h //= 2
+                w //= 2
+                output_sizes.append((n, c, h, w))
             else:
-                zs = torch.split(z, self.z_chunk_size, 1)
-                z = zs[0]
+                output_sizes.append((n, c, h, w))
+        return tuple(output_sizes)
 
-                ys = [torch.cat([y, item], 1) for item in zs[1:]]
-        else:
-            if self.unconditional:
-                ys = [None] * len(self.blocks)
+    def forward(self, x, y=None, logpx=None, reg_states=tuple(), reverse=True, density=False):
+        if reverse:
+            out = self._generate(x, logpx, reg_states,density=density)
+            if self.squeeze_first:
+                x = unsqueeze(out[0])
             else:
-                ys = [y] * len(self.blocks)
+                x = out[0]
+            return x, out[1], out[2]
+        else:
+            if self.squeeze_first:
+                x = squeeze(x)
+            return self._logdensity(x, logpx, reg_states)
 
-        # First linear layer
-        h = self.linear(z)
-        # Reshape
-        h = h.view(h.size(0), -1, self.bottom_width, self.bottom_width)
+    def _logdensity(self, x, logpx=None, reg_states=tuple()):
+        _logpx = torch.zeros(x.shape[0], 1).to(x) if logpx is None else logpx
+        out = []
+        for idx in range(len(self.transforms)):
+            x, _logpx, reg_states = self.transforms[idx].forward(x, _logpx, reg_states)
+            if idx < len(self.transforms) - 1:
+                d = x.size(1) // 2
+                x, factor_out = x[:, :d], x[:, d:]
+            else:
+                # last layer, no factor out
+                factor_out = x
+            out.append(factor_out)
+        out = [o.view(o.size()[0], -1) for o in out]
+        out = torch.cat(out, 1)
+        return out, _logpx, reg_states
 
-        # Loop over blocks
-        for index, blocklist in enumerate(self.blocks):
-            # Second inner loop in case block has multiple layers
-            for block in blocklist:
-                h = block(h, ys[index])
+    def _generate(self, z, logpz=None, reg_states=tuple(),density=False):
+        z = z.view(z.shape[0], -1)
+        zs = []
+        i = 0
+        for dims in self.dims:
+            s = np.prod(dims) #256x256
+            zs.append(z[:, i:i + s])
+            i += s
+        zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, self.dims)] # I believe this is squeezing the noise/latent to match the output of the 'final' layer?
+        _logpz = logpz
+        z_prev, _logpz, _ = self.transforms[-1](zs[-1], _logpz, reverse=True, density=density)
+        for idx in range(len(self.transforms) - 2, -1, -1): # if len(self.transforms) is 10 then idx will be 8,7,..,1,0
+            z_prev = torch.cat((z_prev, zs[idx]), dim=1)
+            z_prev, _logpz, reg_states = self.transforms[idx](z_prev, _logpz, reg_states, reverse=True,density=density)
+        return z_prev, _logpz, reg_states
 
-        # Apply batchnorm-relu-conv-tanh at output
-        return torch.tanh(self.output_layer(h))
+
+class StackedCNFLayers(ODElayers.SequentialFlow):
+    def __init__(
+        self,
+        initial_size,
+        idims=(32,),
+        nonlinearity="softplus",
+        layer_type="concat",
+        div_samples=1,
+        squeeze=True,
+        init_layer=None,
+        n_blocks=1,
+        zero_last=True,
+        strides=None,
+        cnf_kwargs={},
+    ):
+        chain = []
+        if init_layer is not None:
+            chain.append(init_layer)
+
+        def _make_odefunc(size):
+            net = ODEnet(idims, size, strides, True, layer_type=layer_type, nonlinearity=nonlinearity, zero_last_weight=zero_last)
+            f = ODElayers.ODEfunc(net, div_samples=div_samples)
+            return f
+
+        if squeeze:
+            c, h, w = initial_size
+            after_squeeze_size = c * 4, h // 2, w // 2
+            pre = [ODElayers.CNF(_make_odefunc(initial_size), **cnf_kwargs) for _ in range(n_blocks)]
+            post = [ODElayers.CNF(_make_odefunc(after_squeeze_size), **cnf_kwargs) for _ in range(n_blocks)]
+            chain += pre + [ODElayers.SqueezeLayer(2)] + post
+        else:
+            chain += [ODElayers.CNF(_make_odefunc(initial_size), **cnf_kwargs) for _ in range(n_blocks)]
+
+        super(StackedCNFLayers, self).__init__(chain)
 
 
-
+#-----------------------------------------------------
+        
 
 # Parallelized G_D to minimize cross-gpu communication
 # Without this, Generator outputs would get all-gathered and then rebroadcast.
@@ -588,7 +541,7 @@ class G_D(nn.Module):
         # If training G, enable grad tape
         with torch.set_grad_enabled(train_G):
 
-            G_z = self.G(z, self.G.shared(gy))
+            G_z = self.G(z, gy)
             # Cast as necessary
             if self.G.fp16 and not self.D.fp16:
                 G_z = G_z.float()

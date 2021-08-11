@@ -32,29 +32,29 @@ def prepare_parser():
   usage = 'Parser for all scripts.'
   parser = ArgumentParser(description=usage)
   parser.add_argument("--data_folder", type=str)
-  parser.add_argument("--warmup_epochs", type = float, default = 200)
+  parser.add_argument("--warmup_epochs", type = float, default = 20)
 
   parser.add_argument("--id",type=str, default="")
   parser.add_argument("--gpus", type=str, default="")
   parser.add_argument("--sample_every", type=int,default=1000)
   parser.add_argument("--resume_from", type = str)
   parser.add_argument("--epoch_id", type=str, default="")
-  parser.add_argument("--unconditional", action="store_true", default = False)
+  parser.add_argument("--unconditional", action="store_true", default = True)
 
   parser.add_argument("--slow_mixup", action="store_true", default = False)
   parser.add_argument("--consistency_loss", action="store_true", default = False)
-  parser.add_argument("--consistency_loss_and_augmentation", action="store_true", default = False)
+  parser.add_argument("--consistency_loss_and_augmentation", type=bool, default = True)
   parser.add_argument("--full_batch_mixup", action="store_true", default = False)
 
   parser.add_argument("--debug", action='store_true',default=False)
   parser.add_argument("--dataloader", type=str, default="celeba128")
-  parser.add_argument("--unet_mixup", action="store_true", default = False)
+  parser.add_argument("--unet_mixup", type=bool, default = True )
 
   parser.add_argument("--progress_bar", action="store_true", default = False)#use progress bar
   parser.add_argument("--display_mixed_batch", action="store_true", default = False)
   ### Dataset/Dataloader stuff ###
   parser.add_argument(
-    '--dataset', type=str, default='coco',
+    '--dataset', type=str, default='celeb128',
     help='Which Dataset to train on, out of I128, I256, C10, C100;'
          'Append "_hdf5" to use the hdf5 version for ISLVRC '
          '(default: %(default)s)')
@@ -69,7 +69,7 @@ def prepare_parser():
     '--no_pin_memory', action='store_false', dest='pin_memory', default=True,
     help='Pin data into memory through dataloader? (default: %(default)s)')
   parser.add_argument(
-    '--shuffle', action='store_true', default=False,
+    '--shuffle', type=bool, default=True,
     help='Shuffle the data (strongly recommended)? (default: %(default)s)')
   parser.add_argument(
     '--load_in_mem', action='store_true', default=False,
@@ -135,11 +135,11 @@ def prepare_parser():
     '--D_nl', type=str, default='relu',
     help='Activation function for D (default: %(default)s)')
   parser.add_argument(
-    '--G_attn', type=str, default='64',
+    '--G_attn', type=str, default='0',
     help='What resolutions to use attention on for G (underscore separated) '
          '(default: %(default)s)')
   parser.add_argument(
-    '--D_attn', type=str, default='64',
+    '--D_attn', type=str, default='0',
     help='What resolutions to use attention on for D (underscore separated) '
          '(default: %(default)s)')
   parser.add_argument(
@@ -185,7 +185,7 @@ def prepare_parser():
 
   ### Batch size, parallel, and precision stuff ###
   parser.add_argument(
-    '--batch_size', type=int, default=64,
+    '--batch_size', type=int, default=5,
     help='Default overall batchsize (default: %(default)s)')
   parser.add_argument(
     '--G_batch_size', type=int, default=0,
@@ -205,10 +205,10 @@ def prepare_parser():
     '--split_D', action='store_true', default=False,
     help='Run D twice rather than concatenating inputs? (default: %(default)s)')
   parser.add_argument(
-    '--num_epochs', type=int, default=10000,
+    '--num_epochs', type=int, default=100,
     help='Number of epochs to train for (default: %(default)s)')
   parser.add_argument(
-    '--parallel', action='store_true', default=True,
+    '--parallel', type=bool, default=True,
     help='Train with multiple GPUs (default: %(default)s)')
   parser.add_argument(
     '--G_fp16', action='store_true', default=False,
@@ -225,10 +225,10 @@ def prepare_parser():
     help='Train with half-precision activations but fp32 params in G? '
          '(default: %(default)s)')
   parser.add_argument(
-    '--accumulate_stats', action='store_true', default=False,
+    '--accumulate_stats', type=bool, default=True,
     help='Accumulate "standing" batchnorm stats? (default: %(default)s)')
   parser.add_argument(
-    '--num_standing_accumulations', type=int, default=16,
+    '--num_standing_accumulations', type=int, default=100,
     help='Number of forward passes to use in accumulating standing stats? '
          '(default: %(default)s)')
 
@@ -293,7 +293,7 @@ def prepare_parser():
     help='Optionally override the automatic experiment naming with this arg. '
          '(default: %(default)s)')
   parser.add_argument(
-    '--config_from_name', action='store_true', default=False,
+    '--config_from_name', type=bool, default=True,
     help='Use a hash of the experiment name instead of the full config '
          '(default: %(default)s)')
 
@@ -313,13 +313,13 @@ def prepare_parser():
 
   ### Numerical precision and SV stuff ###
   parser.add_argument(
-    '--adam_eps', type=float, default=1e-8,
+    '--adam_eps', type=float, default=1e-6,
     help='epsilon value to use for Adam (default: %(default)s)')
   parser.add_argument(
     '--BN_eps', type=float, default=1e-5,
     help='epsilon value to use for BatchNorm (default: %(default)s)')
   parser.add_argument(
-    '--SN_eps', type=float, default=1e-8,
+    '--SN_eps', type=float, default=1e-6,
     help='epsilon value to use for Spectral Norm(default: %(default)s)')
   parser.add_argument(
     '--num_G_SVs', type=int, default=1,
@@ -384,11 +384,6 @@ def prepare_parser():
   
 
 
-
-  parser.add_argument("--datadir", default="./data/")
-  parser.add_argument("--nworkers", type=int, default=4)
-  parser.add_argument("--data", choices=["mnist", "svhn", "cifar10", 'lsun_church', 'celebahq', 'imagenet64'], 
-          type=str, default="mnist")
   parser.add_argument("--dims", type=str, default="64,64,64")
   parser.add_argument("--strides", type=str, default="1,1,1,1")
   parser.add_argument("--num_blocks", type=int, default=26, help='Number of stacked CNFs.')
@@ -401,31 +396,19 @@ def prepare_parser():
   parser.add_argument(
       "--nonlinearity", type=str, default="softplus", choices=["tanh", "relu", "softplus", "elu"]
   )
-  parser.add_argument('--solver', type=str, default='rk4', choices=SOLVERS)
-  parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'sgd'])
-  parser.add_argument('--atol', type=float, default=1e-5, help='only for adaptive solvers')
-  parser.add_argument('--rtol', type=float, default=1e-5,  help='only for adaptive solvers')
-  parser.add_argument('--step_size', type=float, default=0.25, help='only for fixed step size solvers')
-  parser.add_argument('--first_step', type=float, default=0.166667, help='only for adaptive solvers')
 
-  parser.add_argument('--test_solver', type=str, default='rk4', choices=SOLVERS + [None])
-  parser.add_argument('--test_atol', type=float, default=1e-5)
-  parser.add_argument('--test_rtol', type=float, default=1e-5)
-  parser.add_argument('--test_step_size', type=float, default=None)
-  parser.add_argument('--test_first_step', type=float, default=None)
-
-  parser.add_argument("--imagesize", type=int, default=None)
+  parser.add_argument("--imagesize", type=int, default=128)
   parser.add_argument("--alpha", type=float, default=1e-6)
   parser.add_argument('--time_length', type=float, default=1.0)
   parser.add_argument('--train_T', type=eval, default=False)
 
-  parser.add_argument("--num_epochs", type=int, default=20)
-  parser.add_argument("--batch_size", type=int, default=3)
-  parser.add_argument(
-      "--batch_size_schedule", type=str, default="", help="Increases the batchsize at every given epoch, dash separated."
-  )
-  parser.add_argument("--test_batch_size", type=int, default=3)
-  parser.add_argument("--lr", type=float, default=1e-3)
+  #parser.add_argument("--num_epochs", type=int, default=20)
+  #parser.add_argument("--batch_size", type=int, default=3)
+  #parser.add_argument(
+  #    "--batch_size_schedule", type=str, default="", help="Increases the batchsize at every given epoch, dash separated."
+  #)
+  #parser.add_argument("--test_batch_size", type=int, default=3)
+  parser.add_argument("--lr", type=float, default=5e-5)
   parser.add_argument("--warmup_iters", type=float, default=1000)
   parser.add_argument("--weight_decay", type=float, default=0.)
 
@@ -434,24 +417,8 @@ def prepare_parser():
   parser.add_argument('--div_samples',type=int, default=1)
   parser.add_argument('--squeeze_first', type=eval, default=False, choices=[True, False])
   parser.add_argument('--zero_last', type=eval, default=True, choices=[True, False])
-  parser.add_argument('--seed', type=int, default=42)
 
-  # Regularizations
-  parser.add_argument('--kinetic-energy', type=float, default=0.01, help="int_t ||f||_2^2")
-  parser.add_argument('--jacobian-norm2', type=float, default=0.01, help="int_t ||df/dx||_F^2")
-  parser.add_argument('--total-deriv', type=float, default=None, help="int_t ||df/dt||^2")
-  parser.add_argument('--directional-penalty', type=float, default=None, help="int_t ||(df/dx)^T f||^2")
-
-  parser.add_argument(
-      "--max_grad_norm", type=float, default=np.inf,
-      help="Max norm of graidents"
-  )
-
-  parser.add_argument("--resume", type=str, default=None, help='path to saved check point')
-  parser.add_argument("--save", type=str, default="../experiments/celebahq/example/")
-  parser.add_argument("--val_freq", type=int, default=1)
-  parser.add_argument("--log_freq", type=int, default=1)
-  parser.add_argument('--validate', type=eval, default=False, choices=[True, False])
+  parser.add_argument("--max_grad_norm", type=float, default=np.inf,help="Max norm of graidents")
 
   parser.add_argument('--distributed', action='store_true', help='Run distributed training. Default True')
   parser.add_argument('--dist-url', default='env://', type=str,
@@ -461,7 +428,23 @@ def prepare_parser():
                       help='Used for multi-process training. Can either be manually set ' +
                       'or automatically set by using \'python -m multiproc\'.')
 
-
+  parser.add_argument('--solver', type=str, default='rk4', choices=SOLVERS)
+  parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'sgd'])
+  parser.add_argument('--atol', type=float, default=1e-5, help='only for adaptive solvers')
+  parser.add_argument('--rtol', type=float, default=1e-5,  help='only for adaptive solvers')
+  parser.add_argument('--step_size', type=float, default=0.25, help='only for fixed step size solvers')
+  parser.add_argument('--first_step', type=float, default=0.166667, help='only for adaptive solvers')
+  parser.add_argument('--test_solver', type=str, default='rk4', choices=SOLVERS + [None])
+  parser.add_argument('--test_atol', type=float, default=1e-5)
+  parser.add_argument('--test_rtol', type=float, default=1e-5)
+  parser.add_argument('--test_step_size', type=float, default=None)
+  parser.add_argument('--test_first_step', type=float, default=None)
+  # Regularizations
+  parser.add_argument('--kinetic-energy', type=float, default=0.01, help="int_t ||f||_2^2")
+  parser.add_argument('--jacobian-norm2', type=float, default=0.01, help="int_t ||df/dx||_F^2")
+  parser.add_argument('--total-deriv', type=float, default=None, help="int_t ||df/dt||^2")
+  parser.add_argument('--directional-penalty', type=float, default=None, help="int_t ||(df/dx)^T f||^2")
+  
   return parser
 
 # Arguments for sample.py; not presently used in train.py
@@ -1179,14 +1162,19 @@ def name_from_config(config):
 
 
 # A simple function to produce a unique experiment name from the animal hashes.
+
 def hashname(name):
   h = hash(name)
-  a = h % len(animal_hash.a)
-  h = h // len(animal_hash.a)
-  b = h % len(animal_hash.b)
-  h = h // len(animal_hash.c)
-  c = h % len(animal_hash.c)
-  return animal_hash.a[a] + animal_hash.b[b] + animal_hash.c[c]
+  #h = h // len(animal_hash.a)
+  #b = h % len(animal_hash.b)
+  #h = h // len(animal_hash.c)
+  #c = h % len(animal_hash.c)
+  #a = h % len(animal_hash.a)
+  #return animal_hash.a[a] + animal_hash.b[b] + animal_hash.c[c]
+  
+  if len(str(abs(h)))>6:
+    h = str(abs(h))[:5]
+  return h
 
 
 # Get GPU memory, -i is the index

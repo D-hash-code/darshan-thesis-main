@@ -34,11 +34,6 @@ def BCEfakeloss(D_fake,target):
 
 
 
-
-
-
-
-
 def GAN_training_function(G, D, GD, z_, y_, ema, state_dict, config):
     def train(x, y, epoch, batch_size, target_map = None, r_mixup = 0.0):
         G.optim.zero_grad()

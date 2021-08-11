@@ -31,7 +31,7 @@ class CNF(nn.Module):
         self.solver_options = {}
         self.test_solver_options = {}
 
-    def forward(self, z, logpz=None, reg_states=tuple(), integration_times=None, reverse=False):
+    def forward(self, z, logpz=None, reg_states=tuple(), integration_times=None, reverse=False, density=False):
 
         if not len(reg_states)==self.nreg and self.training:
             reg_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
@@ -46,38 +46,70 @@ class CNF(nn.Module):
         if reverse:
             integration_times = _flip(integration_times, 0)
 
+        self.odefunc.density=density
+
 
         # Refresh the odefunc statistics.
         self.odefunc.before_odeint()
 
+        if density:
+            if self.training:
+                state_t = odeint(
+                    self.odefunc,
+                    (z, _logpz) + reg_states,
+                    integration_times.to(z),
+                    atol=[self.atol, self.atol] + [1e20] * len(reg_states) if self.solver in ['dopri5', 'bosh3'] else self.atol,
+                    rtol=[self.rtol, self.rtol] + [1e20] * len(reg_states) if self.solver in ['dopri5', 'bosh3'] else self.rtol,
+                    method=self.solver,
+                    options=self.solver_options,
+                )
+            else:
+                state_t = odeint(
+                    self.odefunc,
+                    (z, _logpz),
+                    integration_times.to(z),
+                    atol=self.test_atol,
+                    rtol=self.test_rtol,
+                    method=self.test_solver,
+                    options=self.test_solver_options,
+                )
+            
+
+            if len(integration_times) == 2:
+                state_t = tuple(s[1] for s in state_t)
+
+            z_t, logpz_t = state_t[:2]
+            reg_states = state_t[2:]
+
+            return z_t, logpz_t, reg_states
+
         if self.training:
             state_t = odeint(
                 self.odefunc,
-                (z, _logpz) + reg_states,
+                z,
                 integration_times.to(z),
-                atol=[self.atol, self.atol] + [1e20] * len(reg_states) if self.solver in ['dopri5', 'bosh3'] else self.atol,
-                rtol=[self.rtol, self.rtol] + [1e20] * len(reg_states) if self.solver in ['dopri5', 'bosh3'] else self.rtol,
+                atol=self.atol,
+                rtol=self.rtol,
                 method=self.solver,
                 options=self.solver_options,
             )
         else:
             state_t = odeint(
                 self.odefunc,
-                (z, _logpz),
+                z,
                 integration_times.to(z),
                 atol=self.test_atol,
                 rtol=self.test_rtol,
                 method=self.test_solver,
                 options=self.test_solver_options,
             )
+        
 
-        if len(integration_times) == 2:
-            state_t = tuple(s[1] for s in state_t)
+        #if len(integration_times) == 2:
+        #    state_t = tuple(s[1] for s in state_t)
 
-        z_t, logpz_t = state_t[:2]
-        reg_states = state_t[2:]
-
-        return z_t, logpz_t, reg_states
+        return state_t
+        
 
     def num_evals(self):
         return self.odefunc._num_evals.item()

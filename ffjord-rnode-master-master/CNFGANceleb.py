@@ -86,10 +86,10 @@ def requires_grad(model, flag=True):
         p.requires_grad = flag
 
 
-def add_noise(x, nbits=8): ##** What datatype is x input?
+def add_noise(x, nbits=8, add_noise=True): ##** What datatype is x input?
     if nbits<8:
         x = x // (2**(8-nbits)) #Divide by powers of 2, higher powers if bits farther from 8
-    if args.add_noise:
+    if add_noise:
         noise = x.new().resize_as_(x).uniform_()
     else:
         noise = 1/2
@@ -209,6 +209,35 @@ def create_model(args, data_shape, regularization_fns):
 
     return model
 
+def set_cnf_options(args, model):
+
+    def _set(module):
+        if isinstance(module, layers.CNF):
+            # Set training settings
+            module.solver = args.solver
+            module.atol = args.atol
+            module.rtol = args.rtol
+            if args.step_size is not None:
+                module.solver_options['step_size'] = args.step_size
+            if args.first_step is not None:
+                module.solver_options['first_step'] = args.first_step
+
+            # If using fixed-grid adams, restrict order to not be too high.
+            if args.solver in ['fixed_adams', 'explicit_adams']:
+                module.solver_options['max_order'] = 4
+
+            # Set the test settings
+            module.test_solver = args.test_solver if args.test_solver else args.solver
+            module.test_atol = args.test_atol if args.test_atol else args.atol
+            module.test_rtol = args.test_rtol if args.test_rtol else args.rtol
+            if args.test_step_size is not None:
+                module.test_solver_options['step_size'] = args.test_step_size
+            if args.test_first_step is not None:
+                module.test_solver_options['first_step'] = args.test_first_step
+
+
+    model.apply(_set)
+
 
 
 def run(config,args):
@@ -254,7 +283,8 @@ def run(config,args):
         print(k, ": ", config[k])
 
     #-----------------------------------------------------------------------------
-    G = model.Generator(**config).to(device)
+    G = model.Generator(args,**config).to(device)
+    set_cnf_options(args,G)
     #=============================================================================
 
     D = model.Unet_Discriminator(**config).to(device)
@@ -300,6 +330,22 @@ def run(config,args):
             G_ema.load_state_dict(G.state_dict())
 
         print("loaded weigths")
+    
+    # Prepare loggers for stats; metrics holds test metrics, lmetrics holds any desired training metrics.
+    test_metrics_fname = '%s/%s_log.jsonl' % (config['logs_root'],
+                                            experiment_name)
+    train_metrics_fname = '%s/%s' % (config['logs_root'], experiment_name)
+    print('Inception Metrics will be saved to {}'.format(test_metrics_fname))
+    test_log = unet_utils.MetricsLogger(test_metrics_fname,
+                                 reinitialize=(not config['resume']))
+    print('Training Metrics will be saved to {}'.format(train_metrics_fname))
+    train_log = unet_utils.MyLogger(train_metrics_fname,
+                             reinitialize=(not config['resume']),
+                             logstyle=config['logstyle'])
+    
+    
+    # Write metadata
+    unet_utils.write_metadata(config['logs_root'], experiment_name, config, state_dict)
 
     if config["dataset"]=="celeba128":
         root =  config["data_folder"] #
