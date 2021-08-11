@@ -269,6 +269,13 @@ class Celeba(VisionDataset):
     def __init__(self, root, transform, batch_size = 60, test_mode = False, return_all = False, imsize=128,download=True):
 
         self.root = root
+        if not os.path.exists(root):
+            print('Making directory %s' % (root))
+            os.mkdir(root)
+            if download:
+                self.download()
+
+        
         self.transform = transform
         self.return_all = return_all
         all_files = os.listdir(self.root)
@@ -284,8 +291,7 @@ class Celeba(VisionDataset):
 
         self.fixed_indices = []
 
-        if download:
-            self.download()
+
 
         for _ in range(batch_size):
             id = np.random.randint(self.length)
