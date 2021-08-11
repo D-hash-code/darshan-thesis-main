@@ -21,7 +21,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter as P
 from torchvision.models.inception import inception_v3
-
+import os 
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 
 # Module that wraps the inception network to enable use with dataparallel and
@@ -248,8 +249,9 @@ def prepare_inception_metrics(dataset, parallel, no_fid=False, use_torch = True)
   # By default, remove the "hdf5" from dataset
 
   dataset = dataset.strip('_hdf5')
-  data_mu = np.load(dataset+'_inception_moments.npz')['mu']
-  data_sigma = np.load(dataset+'_inception_moments.npz')['sigma']
+  npzpath = os.path.join(dir_path,'celeba128_inception_moments.npz')
+  data_mu = np.load(npzpath)['mu']
+  data_sigma = np.load(npzpath)['sigma']
   #print("data_mu")
   #print(data_mu)
   #print("data_sigma")
