@@ -284,6 +284,9 @@ class Celeba(VisionDataset):
 
         self.fixed_indices = []
 
+        if download:
+            self.download()
+
         for _ in range(batch_size):
             id = np.random.randint(self.length)
             self.fixed_indices.append(id)
