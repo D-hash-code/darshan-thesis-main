@@ -285,7 +285,7 @@ def run(config,args):
         print(k, ": ", config[k])
 
     #-----------------------------------------------------------------------------
-    G = model.Generator(args,**config).to(device)
+    G = model.Generator(args,config).to(device)
     set_cnf_options(args,G)
     #=============================================================================
 

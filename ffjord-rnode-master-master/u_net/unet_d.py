@@ -344,7 +344,7 @@ class Generator(nn.Module):
         n_resblocks (int): Length of the resnet for each coupling layer.
     """
 
-    def __init__(self, args, config,G_lr=5e-5, G_B1=0.0, G_B2=0.999, adam_eps=1e-8):
+    def __init__(self, args, config, G_lr=5e-5, G_B1=0.0, G_B2=0.999, adam_eps=1e-8):
         super(Generator, self).__init__()
 
         
@@ -384,11 +384,11 @@ class Generator(nn.Module):
 
         self.dims = [o[1:] for o in self.calc_output_size(input_size)]
 
-        self.lr, self.B1, self.B2, self.adam_eps = G_lr, G_B1, G_B2, adam_eps
+        #self.lr, self.B1, self.B2, self.adam_eps = G_lr, G_B1, G_B2, adam_eps
 
-        self.optim = optim.Adam(params=self.parameters(), lr=self.lr,
-                                                    betas=(self.B1, self.B2), weight_decay=0,
-                                                    eps=self.adam_eps)
+        self.optim = optim.Adam(params=self.parameters(), lr=config['G_lr'],
+                                                    betas=(config['B1'], config['B2']), weight_decay=0,
+                                                    eps=config['adam_eps'])
 
     def _build_net(self, input_size):
         _, c, h, w = input_size
