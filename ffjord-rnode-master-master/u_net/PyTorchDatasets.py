@@ -266,7 +266,7 @@ class FFHQ(VisionDataset):
 
 class Celeba(VisionDataset):
 
-    def __init__(self, root, transform, batch_size = 60, test_mode = False, return_all = False, imsize=128):
+    def __init__(self, root, transform, batch_size = 60, test_mode = False, return_all = False, imsize=128,download=True):
 
         self.root = root
         self.transform = transform
