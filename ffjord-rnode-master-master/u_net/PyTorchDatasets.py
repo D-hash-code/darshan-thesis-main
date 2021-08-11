@@ -267,15 +267,9 @@ class FFHQ(VisionDataset):
 
 class Celeba(VisionDataset):
 
-    def __init__(self, root, transform, batch_size = 60, test_mode = False, return_all = False, imsize=128,download=True):
+    def __init__(self, root, transform, batch_size = 60, test_mode = False, return_all = False, imsize=128):
 
         self.root = root
-        if not os.path.exists(root):
-            print('Making directory %s' % (root))
-            os.mkdir(root)
-            if download:
-                self.download()
-
         
         self.transform = transform
         self.return_all = return_all
