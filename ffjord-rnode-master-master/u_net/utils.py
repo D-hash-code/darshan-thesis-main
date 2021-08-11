@@ -81,7 +81,7 @@ def prepare_parser():
 
   ### Model stuff ###
   parser.add_argument(
-    '--model', type=str, default='unet_d',
+    '--model', type=str, default='u_net/unet_d',
     help='Name of the model module (default: %(default)s)')
   parser.add_argument(
     '--G_param', type=str, default='SN',

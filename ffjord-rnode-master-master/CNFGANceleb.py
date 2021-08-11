@@ -53,6 +53,8 @@ import dist_utils
 from dist_utils import env_world_size, env_rank
 from torch.utils.data.distributed import DistributedSampler
 
+import u_net.unet_d as unet_d
+
 #-----------------------------
 
 # Custom objects know their class.
@@ -270,7 +272,7 @@ def run(config,args):
     unet_utils.prepare_root(config)
 
     # Import the model--this line allows us to dynamically select different files.
-    model = __import__(config['model'])
+    model = unet_d
     experiment_name = (config['experiment_name'] if config['experiment_name']
                        else unet_utils.name_from_config(config))
     print('Experiment name is %s' % experiment_name)
