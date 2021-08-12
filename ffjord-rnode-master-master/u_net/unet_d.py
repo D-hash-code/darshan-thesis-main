@@ -561,6 +561,8 @@ class G_D(nn.Module):
                 print('target_map: ',target_map)
                 print('x: ', x)
                 print('G_z: ', G_z)
+                mixed = target_map*x+(1-target_map)*G_z
+
 
             mixed_y = dy
 
