@@ -23,6 +23,7 @@ import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
+import logging
 
 import u_net.datasets as dset
 
@@ -869,6 +870,12 @@ class MyLogger(object):
     self.root = fname
     if not os.path.exists(self.root):
       os.mkdir(self.root)
+    #if not os.path.exists(self.root[:-6] +'better.'):
+    #  os.mkdir(self.root)
+    #  logger = logging.getLogger()
+    #  level = logging.INFO
+    #  logger.setLevel(level)
+    #  info_file_handler = logging.FileHandler(self.root)
     self.reinitialize = reinitialize
     self.metrics = []
     self.logstyle = logstyle # One of '%3.3f' or like '%3.3e'

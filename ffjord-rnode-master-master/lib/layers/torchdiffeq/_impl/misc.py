@@ -159,11 +159,11 @@ class _ReverseFunc(torch.nn.Module):
         try:
             return self.mul * self.base_func(-t, y)
         except TypeError:
-            print('mul: ',type(self.mul))
-            print('base func out: ', type(self.base_func(-t, y)))
-            print('mul: ',self.mul)
-            print('base func out: ', self.base_func(-t, y))
-            return self.mul * self.base_func(-t, y)
+            #print('mul: ',type(self.mul))
+            #print('base func out: ', type(self.base_func(-t, y)))
+            #print('mul: ',self.mul)
+            #print('base func out: ', self.base_func(-t, y))
+            return tuple(map((self.mul).__mul__, self.base_func(-t, y)))
 
 
 
