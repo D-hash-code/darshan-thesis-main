@@ -440,12 +440,13 @@ class Generator(nn.Module):
 
     def forward(self, x, y=None, logpx=None, reg_states=tuple(), reverse=True, density=True):
         if reverse:
+            dev = x.device
             out = self._generate(x, logpx, reg_states,density=density)
             if self.squeeze_first:
                 x = unsqueeze(out[0])
             else:
                 x = out[0]
-            return torch.Tensor(x,dtype=torch.float32,device=x.device), out[1], out[2]
+            return torch.Tensor(x,dtype=torch.float32,device=dev), out[1], out[2]
         else:
             if self.squeeze_first:
                 x = squeeze(x)
