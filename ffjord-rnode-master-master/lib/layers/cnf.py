@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from lib.layers.torchdiffeq._impl import odeint_adjoint as odeint
+from torchdiffeq import odeint_adjoint as odeint
 
 from .wrappers.cnf_regularization import RegularizedODEfunc
 
@@ -17,9 +17,9 @@ class CNF(nn.Module):
             self.register_buffer("sqrt_end_time", torch.sqrt(torch.tensor(T)))
 
         nreg = 0
-        #if regularization_fns is not None:
-        #    odefunc = RegularizedODEfunc(odefunc, regularization_fns)
-        #    nreg = len(regularization_fns)
+        if regularization_fns is not None:
+            odefunc = RegularizedODEfunc(odefunc, regularization_fns)
+            nreg = len(regularization_fns)
         self.odefunc = odefunc
         self.nreg = nreg
         self.solver = solver
@@ -33,8 +33,8 @@ class CNF(nn.Module):
 
     def forward(self, z, logpz=None, reg_states=tuple(), integration_times=None, reverse=False, density=False):
 
-        #if not len(reg_states)==self.nreg and self.training:
-        #    reg_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
+        if not len(reg_states)==self.nreg and self.training:
+            reg_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
 
         if logpz is None and density:
             _logpz = torch.zeros(z.shape[0], 1).to(z)
@@ -105,8 +105,8 @@ class CNF(nn.Module):
             )
         
 
-        #if len(integration_times) == 2:
-        #    state_t = tuple(s[1] for s in state_t)
+        if len(integration_times) == 2:
+            state_t = tuple(s[1] for s in state_t)
 
         return state_t
         
