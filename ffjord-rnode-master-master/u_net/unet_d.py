@@ -436,7 +436,7 @@ class Generator(nn.Module):
                 output_sizes.append((n, c, h, w))
         return tuple(output_sizes)
 
-    def forward(self, x, y=None, logpx=None, reg_states=tuple(), reverse=True, density=False):
+    def forward(self, x, y=None, logpx=None, reg_states=tuple(), reverse=True, density=True):
         if reverse:
             out = self._generate(x, logpx, reg_states,density=density)
             if self.squeeze_first:
