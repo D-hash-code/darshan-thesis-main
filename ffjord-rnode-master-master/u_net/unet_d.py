@@ -552,7 +552,16 @@ class G_D(nn.Module):
         if mixup:
             initial_x_size = x.size(0)
 
-            mixed = target_map*x+(1-target_map)*G_z
+            try:
+                mixed = target_map*x+(1-target_map)*G_z
+            except TypeError:
+                print('target_map type: ', type(target_map))
+                print('x type: ', type(x))
+                print('G_z type: ', type(G_z))
+                print('target_map: ',target_map)
+                print('x: ', x)
+                print('G_z: ', G_z)
+
             mixed_y = dy
 
 
