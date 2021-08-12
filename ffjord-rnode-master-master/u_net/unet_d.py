@@ -445,6 +445,8 @@ class Generator(nn.Module):
                 x = unsqueeze(out[0])
             else:
                 x = out[0]
+            if not isinstance(x,torch.Tensor):
+                x = x[0]
             return x, out[1], out[2]
         else:
             if self.squeeze_first:
@@ -574,7 +576,8 @@ class G_D(nn.Module):
                 print('G_z[0]: ',G_z[2])
 
                 print('G_z: ', G_z[0].shape)
-                mixed = target_map*x+(1-target_map)*G_z[0]
+                G_z = G_z[0]
+                mixed = target_map*x+(1-target_map)*G_z
 
 
             mixed_y = dy
