@@ -538,6 +538,7 @@ class G_D(nn.Module):
     def forward(self, z, gy, x=None, dy=None, train_G=False, return_G_z=False,
                             split_D=False, dw1=[],dw2=[], reference_x = None, mixup = False, mixup_only = False, target_map=None):
 
+        print('z_[:batchsize] shape: ', z.shape)
         if mixup:
             gy = dy
             #why? so the mixup samples consist of same class

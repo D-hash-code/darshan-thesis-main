@@ -86,7 +86,7 @@ def GAN_training_function(G, D, GD, z_, y_, ema, state_dict, config):
                 if use_mixup_in_this_round:
 
                     if (not config["full_batch_mixup"]) or (config["full_batch_mixup"] and (config["consistency_loss_and_augmentation"] or config["consistency_loss"]) ):
-
+                        print('z_ shape: ', z_.shape)
                         D_fake, D_real , D_mixed, G_z, mixed,  D_middle_fake, D_middle_real, D_middle_mixed, target_map   = GD(z_[:batch_size], y_[:batch_size],
                                                             x[counter], y[counter], train_G=False,
                                                             split_D=config['split_D'], mixup = True, target_map = target_map) # mixup can be true because weight is set to 0 when no mixup is used
