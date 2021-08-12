@@ -566,7 +566,11 @@ class G_D(nn.Module):
                 print('G_z: ',G_z)
                 #G_z=torch.Tensor(G_z,dtype=torch.float32,device=x)
                 #G_z  = torch.from_numpy(np.array(G_z).as_type(np.float32)).to(x)
-                G_z = torch.stack(list(G_z),dim=0)
+                
+                print('G_z[0] type: ',type(G_z[0]))
+                print('G_z[0]: ',G_z[0])
+                G_z = torch.stack([G for G in G_z])
+
                 print('G_z: ', G_z.shape)
                 mixed = target_map*x+(1-target_map)*G_z
 
