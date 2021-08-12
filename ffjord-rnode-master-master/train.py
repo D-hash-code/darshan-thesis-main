@@ -600,5 +600,6 @@ if __name__ == '__main__':
         exc_type, exc_value, exc_traceback = sys.exc_info()
         import traceback
         traceback.print_tb(exc_traceback, file=sys.stdout)
+        traceback.print_exception(exc_type,exc_value,exc_traceback)
         # in case of exception, wait 2 hours before shutting down
         #if not args.skip_auto_shutdown: os.system(f'sudo shutdown -h -P +{args.auto_shutdown_failure_delay_mins}')
