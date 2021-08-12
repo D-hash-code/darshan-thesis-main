@@ -163,7 +163,9 @@ class _ReverseFunc(torch.nn.Module):
             #print('base func out: ', type(self.base_func(-t, y)))
             #print('mul: ',self.mul)
             #print('base func out: ', self.base_func(-t, y))
-            return tuple(map((self.mul).__mul__, self.base_func(-t, y)))
+            #return tuple(map((self.mul).__mul__, self.base_func(-t, y)))
+            return tuple(np.array(self.base_func(-t, y))*self.mul)
+
 
 
 
