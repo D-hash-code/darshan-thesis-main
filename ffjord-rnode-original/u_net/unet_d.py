@@ -347,7 +347,7 @@ class Generator(nn.Module):
     def __init__(self, args, config, G_lr=5e-5, G_B1=0.0, G_B2=0.999, adam_eps=1e-8):
         super(Generator, self).__init__()
 
-        
+        self.fp16 = False
         hidden_dims = tuple(map(int, args.dims.split(",")))
         strides = tuple(map(int, args.strides.split(",")))
         
