@@ -8,6 +8,7 @@ _DEFAULT_ALPHA = 1e-6
 class ZeroMeanTransform(nn.Module):
     def __init__(self):
         nn.Module.__init__(self)
+        self.odelayer=False
 
     def forward(self, x, logpx=None, reg_states=tuple(), reverse=False):
         if reverse:
@@ -32,6 +33,7 @@ class LogitTransform(nn.Module):
     def __init__(self, alpha=_DEFAULT_ALPHA):
         nn.Module.__init__(self)
         self.alpha = alpha
+        self.odelayer=False
 
     def forward(self, x, logpx=None, reg_states=tuple(), reverse=False):
         if reverse:
@@ -48,6 +50,7 @@ class SigmoidTransform(nn.Module):
     def __init__(self, alpha=_DEFAULT_ALPHA):
         nn.Module.__init__(self)
         self.alpha = alpha
+        self.odelayer=False
 
     def forward(self, x, logpx=None, reg_states=tuple(), reverse=False):
         if reverse:
