@@ -465,7 +465,7 @@ class Generator(nn.Module):
         out = torch.cat(out, 1)
         return out, _logpx, reg_states
 
-    def _generate(self, z, logpz=None, reg_states=tuple(),density=False):
+    def _generate(self, z, logpz=None, reg_states=tuple(),density=True):
         z = z.view(z.shape[0], -1)
         zs = []
         i = 0

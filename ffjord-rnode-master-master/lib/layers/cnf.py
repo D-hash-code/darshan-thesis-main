@@ -31,7 +31,7 @@ class CNF(nn.Module):
         self.solver_options = {}
         self.test_solver_options = {}
 
-    def forward(self, z, logpz=None, reg_states=tuple(), integration_times=None, reverse=False, density=False):
+    def forward(self, z, logpz=None, reg_states=tuple(), integration_times=None, reverse=False, density=True):
 
         if not len(reg_states)==self.nreg and self.training:
             reg_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
@@ -46,7 +46,7 @@ class CNF(nn.Module):
         if reverse:
             integration_times = _flip(integration_times, 0)
 
-        self.odefunc.density=True
+        self.odefunc.density=density
 
 
         # Refresh the odefunc statistics.
