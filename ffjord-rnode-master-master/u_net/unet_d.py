@@ -446,7 +446,7 @@ class Generator(nn.Module):
                 x = unsqueeze(out[0])
             else:
                 x = out[0]
-            return torch.Tensor(x,dtype=torch.float32,device=dev), out[1], out[2]
+            return x, out[1], out[2]
         else:
             if self.squeeze_first:
                 x = squeeze(x)
@@ -563,6 +563,7 @@ class G_D(nn.Module):
                 print('target_map: ',target_map.shape)
                 print('x: ', x.shape)
                 print('G_z: ', G_z.shape)
+                G_z=torch.Tensor(G_z,dtype=torch.float32,device=x)
                 mixed = target_map*x+(1-target_map)*G_z
 
 
