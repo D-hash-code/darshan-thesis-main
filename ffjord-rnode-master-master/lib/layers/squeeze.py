@@ -7,7 +7,7 @@ class SqueezeLayer(nn.Module):
     def __init__(self, downscale_factor):
         super(SqueezeLayer, self).__init__()
         self.downscale_factor = downscale_factor
-
+        self.density=True
     def forward(self, x, logpx=None, reg_states=tuple(), reverse=False):
         if reverse:
             return self._upsample(x, logpx, reg_states)
