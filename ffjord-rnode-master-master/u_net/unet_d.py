@@ -558,9 +558,9 @@ class G_D(nn.Module):
                 print('target_map type: ', type(target_map))
                 print('x type: ', type(x))
                 print('G_z type: ', type(G_z))
-                print('target_map: ',target_map)
-                print('x: ', x)
-                print('G_z: ', G_z)
+                print('target_map: ',target_map.shape)
+                print('x: ', x.shape)
+                print('G_z: ', G_z.shape)
                 mixed = target_map*x+(1-target_map)*G_z
 
 
