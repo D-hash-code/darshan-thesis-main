@@ -273,7 +273,10 @@ class Celeba(VisionDataset):
         
         self.transform = transform
         self.return_all = return_all
-        all_files = os.listdir(self.root)
+        #all_files = os.listdir(self.root)
+        all_files = []
+        for i in range(1,202600): #
+            all_files.append(str(i).zfill(6) + '.png')
         self.length = len(all_files)
         self.fixed_transform = transforms.Compose(
                 [ transforms.Resize(imsize),
