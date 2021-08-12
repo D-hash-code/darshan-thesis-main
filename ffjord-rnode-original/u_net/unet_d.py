@@ -475,10 +475,10 @@ class Generator(nn.Module):
             i += s
         zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, self.dims)] # I believe this is squeezing the noise/latent to match the output of the 'final' layer?
         _logpz = logpz
-        z_prev, _logpz, _ = self.transforms[-1](zs[-1], _logpz, reverse=True, density=density)
+        z_prev, _logpz, _ = self.transforms[-1](zs[-1], _logpz, reverse=True)
         for idx in range(len(self.transforms) - 2, -1, -1): # if len(self.transforms) is 10 then idx will be 8,7,..,1,0
             z_prev = torch.cat((z_prev, zs[idx]), dim=1)
-            z_prev, _logpz, reg_states = self.transforms[idx](z_prev, _logpz, reg_states, reverse=True,density=density)
+            z_prev, _logpz, reg_states = self.transforms[idx](z_prev, _logpz, reg_states, reverse=True)
         return z_prev, _logpz, reg_states
 
 
