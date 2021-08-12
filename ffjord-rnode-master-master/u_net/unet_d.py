@@ -6,6 +6,7 @@ import math
 import functools
 
 import torch
+from torch._C import dtype
 import torch.nn as nn
 from torch.nn import init
 import torch.optim as optim
@@ -444,7 +445,7 @@ class Generator(nn.Module):
                 x = unsqueeze(out[0])
             else:
                 x = out[0]
-            return torch.Tensor(x), out[1], out[2]
+            return torch.Tensor(x,dtype=torch.float32,device=x.device), out[1], out[2]
         else:
             if self.squeeze_first:
                 x = squeeze(x)
