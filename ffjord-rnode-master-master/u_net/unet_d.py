@@ -447,7 +447,7 @@ class Generator(nn.Module):
                 x = out[0]
             if not isinstance(x,torch.Tensor):
                 x = x[0]
-            return x, out[1], out[2]
+            return x # , out[1], out[2]
         else:
             if self.squeeze_first:
                 x = squeeze(x)
