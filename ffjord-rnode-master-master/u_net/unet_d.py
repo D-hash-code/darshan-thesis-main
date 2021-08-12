@@ -127,7 +127,7 @@ def D_unet_arch(ch=64, attention='0',ksize='333333', dilation='111111',out_chann
 
 class Unet_Discriminator(nn.Module):
 
-    def __init__(self, D_ch=64, D_wide=True, resolution=256,
+    def __init__(self, D_ch=64, D_wide=True, resolution=128,
                              D_kernel_size=3, D_attn='0',
                              num_D_SVs=1, num_D_SV_itrs=1, D_activation=nn.ReLU(inplace=False),
                              D_lr=2e-4, D_B1=0.0, D_B2=0.999, adam_eps=1e-8,
@@ -606,6 +606,8 @@ class G_D(nn.Module):
             G_z = None
             x = None
 
+        print('D_input type: ', type(D_input))
+        
         D_out, D_middle = self.D(D_input, D_class)
 
         del D_input
