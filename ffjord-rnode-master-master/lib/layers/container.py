@@ -17,8 +17,9 @@ class SequentialFlow(nn.Module):
                 inds = range(len(self.chain))
         if density:
             for i in inds:
-                self.chain[i].density=density 
-                self.chain[i].odefunc.density=density
+                if self.chain[i].odelayer:
+                    self.chain[i].density=density
+                    self.chain[i].odefunc.density=density
                 x, logpx, reg_states = self.chain[i](x, logpx, reg_states, reverse=reverse)
             return x, logpx, reg_states
         

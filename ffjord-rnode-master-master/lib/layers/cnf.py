@@ -30,6 +30,7 @@ class CNF(nn.Module):
         self.test_rtol = rtol
         self.solver_options = {}
         self.test_solver_options = {}
+        self.odelayer = True
         self.density=True
 
     def forward(self, z, logpz=None, reg_states=tuple(), integration_times=None, reverse=False):
