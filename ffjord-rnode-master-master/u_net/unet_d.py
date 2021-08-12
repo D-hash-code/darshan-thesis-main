@@ -564,7 +564,7 @@ class G_D(nn.Module):
                 print('x: ', x.shape)
                 print('G_z len: ', len(G_z))
                 #G_z=torch.Tensor(G_z,dtype=torch.float32,device=x)
-                G_z  = torch.Tensor(np.array(G_z),dtype=torch.float32,device=x.device)
+                G_z  = torch.from_numpy(np.array(G_z)).to(x)
                 print('G_z: ', G_z.shape)
                 mixed = target_map*x+(1-target_map)*G_z
 
