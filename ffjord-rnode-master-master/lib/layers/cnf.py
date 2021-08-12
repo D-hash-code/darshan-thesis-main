@@ -46,7 +46,7 @@ class CNF(nn.Module):
         if reverse:
             integration_times = _flip(integration_times, 0)
 
-        self.odefunc.density=density
+        self.odefunc.density=True
 
 
         # Refresh the odefunc statistics.
