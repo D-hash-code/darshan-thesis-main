@@ -1220,7 +1220,7 @@ class Distribution(torch.Tensor):
 # Convenience function to prepare a z and y vector
 def prepare_z_y(G_batch_size, dim_z, nclasses=1, device='cuda',
                 fp16=False,z_var=1.0, z_distribution = 'normal'):
-  z_ = Distribution(torch.randn(G_batch_size, dim_z, requires_grad=False))
+  z_ = Distribution(torch.randn(G_batch_size, *(3,dim_z,dim_z), requires_grad=False))
   z_.init_distribution(z_distribution, mean=0, var=z_var, bs = G_batch_size)
   z_ = z_.to(device,torch.float32)
 
