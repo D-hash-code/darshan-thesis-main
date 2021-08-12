@@ -117,10 +117,21 @@ def rk4_alt_step_func(func, t0, dt, t1, y0, f0=None, perturb=False):
         print('t0: ', t0)
         print('dt: ', dt)
         print('k1: ', k1)
-        k2 = func(t0 + tuple(map(_one_third).__mul,dt),y0 + tuple(map(_one_third).__mul,dt*k1))
+        k1.to(dtype=torch.long, device=t0.device)
+        k2 = func(t0 + dt * _one_third, y0 + dt * k1 * _one_third)
 
-    k3 = func(t0 + dt * _two_thirds, y0 + dt * (k2 - k1 * _one_third))
-    k4 = func(t1, y0 + dt * (k1 - k2 + k3), perturb=Perturb.PREV if perturb else Perturb.NONE)
+    try: k3 = func(t0 + dt * _two_thirds, y0 + dt * (k2 - k1 * _one_third))
+    except TypeError:
+        k2.to(dtype=torch.long, device=t0.device)
+        k3 = func(t0 + dt * _two_thirds, y0 + dt * (k2 - k1 * _one_third))
+    
+    try: 
+        k4 = func(t1, y0 + dt * (k1 - k2 + k3), perturb=Perturb.PREV if perturb else Perturb.NONE)
+    except TypeError:
+        k3.to(dtype=torch.long, device=t0.device)
+        k4 = func(t1, y0 + dt * (k1 - k2 + k3), perturb=Perturb.PREV if perturb else Perturb.NONE)
+
+
     return (k1 + 3 * (k2 + k3) + k4) * dt * 0.125
 
 
