@@ -33,10 +33,10 @@ class CNF(nn.Module):
 
     def forward(self, z, logpz=None, reg_states=tuple(), integration_times=None, reverse=False, density=False):
 
-        if not len(reg_states)==self.nreg and self.training:
-            reg_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
+        #if not len(reg_states)==self.nreg and self.training:
+        #    reg_states = tuple(torch.zeros(z.size(0)).to(z) for i in range(self.nreg))
 
-        if logpz is None:
+        if logpz is None and density:
             _logpz = torch.zeros(z.shape[0], 1).to(z)
         else:
             _logpz = logpz
