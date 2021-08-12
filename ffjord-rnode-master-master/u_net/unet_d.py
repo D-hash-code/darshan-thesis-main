@@ -354,6 +354,7 @@ class Generator(nn.Module):
         data_shape=(3,128,128)
         input_size = (args.batch_size, *data_shape)
         squeeze_first=args.squeeze_first
+        self.fp16=False
 
 
         if squeeze_first:
