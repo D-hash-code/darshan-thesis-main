@@ -440,7 +440,6 @@ class Generator(nn.Module):
 
     def forward(self, x, y=None, logpx=None, reg_states=tuple(), reverse=True, density=True):
         if reverse:
-            dev = x.device
             out = self._generate(x, logpx, reg_states,density=density)
             if self.squeeze_first:
                 x = unsqueeze(out[0])
@@ -573,10 +572,9 @@ class G_D(nn.Module):
                 print('G_z[0]: ',G_z[1])
                 print('G_z[0] type: ',type(G_z[2]))
                 print('G_z[0]: ',G_z[2])
-                G_z = torch.stack([G for G in G_z])
 
-                print('G_z: ', G_z.shape)
-                mixed = target_map*x+(1-target_map)*G_z
+                print('G_z: ', G_z[0].shape)
+                mixed = target_map*x+(1-target_map)*G_z[0]
 
 
             mixed_y = dy
