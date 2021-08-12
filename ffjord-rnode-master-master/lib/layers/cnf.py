@@ -17,9 +17,9 @@ class CNF(nn.Module):
             self.register_buffer("sqrt_end_time", torch.sqrt(torch.tensor(T)))
 
         nreg = 0
-        if regularization_fns is not None:
-            odefunc = RegularizedODEfunc(odefunc, regularization_fns)
-            nreg = len(regularization_fns)
+        #if regularization_fns is not None:
+        #    odefunc = RegularizedODEfunc(odefunc, regularization_fns)
+        #    nreg = len(regularization_fns)
         self.odefunc = odefunc
         self.nreg = nreg
         self.solver = solver
