@@ -24,6 +24,8 @@ from lib.layers.odefunc import ODEnet
 from lib.layers.squeeze import squeeze, unsqueeze
 import numpy as np
 
+from train_misc import create_regularization_fns
+
 
 from torch.optim.optimizer import Optimizer
 class Adam16(Optimizer):
@@ -350,6 +352,8 @@ class Generator(nn.Module):
         self.fp16 = False
         hidden_dims = tuple(map(int, args.dims.split(",")))
         strides = tuple(map(int, args.strides.split(",")))
+
+        regularization_fns, regularization_coeffs = create_regularization_fns(args)
         
         data_shape=(3,128,128)
         input_size = (args.batch_size, *data_shape)
@@ -371,7 +375,7 @@ class Generator(nn.Module):
         self.squash_input = True
         self.alpha = args.alpha
         self.squeeze_first = args.squeeze_first
-        self.cnf_kwargs = {}
+        self.cnf_kwargs={"T": args.time_length, "train_T": args.train_T, "regularization_fns": regularization_fns}
 
         self.dim_z = 128
         self.resolution = 128
