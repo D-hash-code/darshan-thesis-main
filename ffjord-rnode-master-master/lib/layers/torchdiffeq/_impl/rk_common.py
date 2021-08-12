@@ -108,7 +108,17 @@ def rk4_alt_step_func(func, t0, dt, t1, y0, f0=None, perturb=False):
     k1 = f0
     if k1 is None:
         k1 = func(t0, y0, perturb=Perturb.NEXT if perturb else Perturb.NONE)
-    k2 = func(t0 + dt * _one_third, y0 + dt * k1 * _one_third)
+    try:
+        k2 = func(t0 + dt * _one_third, y0 + dt * k1 * _one_third)
+    except TypeError:
+        print('t0 type:', type(t0))
+        print('dt type:', type(dt))
+        print('k1 type:', type(k1))
+        print('t0: ', t0)
+        print('dt: ', dt)
+        print('k1: ', k1)
+        k2 = func(t0 + tuple(map(_one_third).__mul,dt),y0 + tuple(map(_one_third).__mul,dt*k1))
+
     k3 = func(t0 + dt * _two_thirds, y0 + dt * (k2 - k1 * _one_third))
     k4 = func(t1, y0 + dt * (k1 - k2 + k3), perturb=Perturb.PREV if perturb else Perturb.NONE)
     return (k1 + 3 * (k2 + k3) + k4) * dt * 0.125
