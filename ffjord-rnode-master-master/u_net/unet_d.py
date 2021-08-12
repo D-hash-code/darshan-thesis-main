@@ -569,6 +569,10 @@ class G_D(nn.Module):
                 
                 print('G_z[0] type: ',type(G_z[0]))
                 print('G_z[0]: ',G_z[0])
+                print('G_z[0] type: ',type(G_z[1]))
+                print('G_z[0]: ',G_z[1])
+                print('G_z[0] type: ',type(G_z[2]))
+                print('G_z[0]: ',G_z[2])
                 G_z = torch.stack([G for G in G_z])
 
                 print('G_z: ', G_z.shape)
