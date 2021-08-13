@@ -560,7 +560,7 @@ def run(config,args):
                                             state_dict, config, experiment_name+"_mix", sample_only=True, use_real = True, real_batch = mixed, mixed=True, target_map = target_map[:n])
                 
             # Test every specified interval
-            if not (state_dict['itr'] % config['test_every']):
+            if ((i+1) % config['test_every'])==0:
             #if state_dict['itr'] % 100 == 0:
                 if config['G_eval_mode']:
                   print('Switchin G to eval mode...')
