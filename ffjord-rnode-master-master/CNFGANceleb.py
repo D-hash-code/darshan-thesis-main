@@ -261,29 +261,49 @@ def run(config,args):
     print("RESOLUTION: ",config['resolution'])
     config['n_classes'] = 1
     config['G_activation'] = nn.ReLU(inplace=False) ##utils.activation_dict[config['G_nl']]
-    config['D_activation'] = nn.ReLU(inplace=False) ##utils.activation_dict[config['D_nl']]
+    config['D_activation'] = unet_utils.activation_dict[config['D_nl']]
     # By default, skip init if resuming training.
     if config['resume']:
         print('Skipping initialization for training resumption...')
         config['skip_init'] = True
     config = unet_utils.update_config_roots(config)
-    device = 'cuda'
+
+    ############################*************************** Need to check this if i use parallel
+    device = torch.device("cuda:%d"%torch.cuda.current_device() if torch.cuda.is_available() else "cpu")
 
     # Prepare root folders if necessary
     unet_utils.prepare_root(config)
 
-    # Import the model--this line allows us to dynamically select different files.
+    # Import the model--
     model = unet_d
     experiment_name = (config['experiment_name'] if config['experiment_name']
                        else unet_utils.name_from_config(config))
     print('Experiment name is %s' % experiment_name)
-    print("::: weights saved at ", '/'.join([config['weights_root'],experiment_name]) )
+    print("::: weights saved at ", '/'.join([config['weights_root'],experiment_name]) ) ##lg
+    
+    better_logger = utils.get_logger(logpath=os.path.join(config['logs_root'],'better_logger'),filepath=os.path.abspath(__file__))
+    better_logger.info(args)
 
+    better_trainlog = os.path.join(config['logs_root'],'training.csv')
+    better_testlog = os.path.join(config['logs_root'],'test.csv')
+
+    traincolumns = ['itr'] ##lg
+    testcolumns = ['epoch'] ##lg
+
+    if not args.resume:
+        with open(better_trainlog,'w') as f:
+            csvlogger = csv.DictWriter(f, traincolumns)
+            csvlogger.writeheader()
+        with open(better_testlog,'w') as f:
+            csvlogger = csv.DictWriter(f, testcolumns)
+            csvlogger.writeheader()
 
     # Next, build the model
     keys = sorted(config.keys())
     for k in keys:
         print(k, ": ", config[k])
+
+    
 
     #-----------------------------------------------------------------------------
     G = model.Generator(args,config).to(device)
@@ -404,6 +424,13 @@ def run(config,args):
     else:
         loss_steps = 100
 
+    better_logger.info(G)
+    better_logger.info(D)
+    better_logger.info("Number of trainable parameters in Generator CNF: {}".format(count_parameters(G)))
+    better_logger.info("Number of trainable parameters in U-Net Discriminator: {}".format(count_parameters(D)))
+    better_logger.info('Iters per train epoch: {}'.format(len(data_loader)))
+    ##better_logger.info('Iters per test: {}'.format(len(test_loader)))
+
     print('Beginning training at epoch %d...' % state_dict['epoch'])
 
 
@@ -425,109 +452,113 @@ def run(config,args):
 
 
         for i, batch_data in enumerate(pbar):
-            x = batch_data[0]
-            y = batch_data[1]
-            #H = batch_data[2]
 
-            # Increment the iteration counter
-            state_dict['itr'] += 1
-            if config["debug"] and state_dict['itr']>config["stop_it"]:
-                print("code didn't break :)")
-                break
-            # Make sure G and D are in training mode, just in case they got set to eval For D, which typically doesn't have BN, this shouldn't
-            # matter much.
-            G.train()
-            D.train()
-            if config['ema']:
-                G_ema.train()
+            with open(better_trainlog,'a') as f:
+                csvlogger = csv.DictWriter(f,[])
+                x = batch_data[0]
+                y = batch_data[1]
+                #H = batch_data[2]
+
+                # Increment the iteration counter
+                state_dict['itr'] += 1
+                if config["debug"] and state_dict['itr']>config["stop_it"]:
+                    print("code didn't break :)")
+                    break
+                # Make sure G and D are in training mode, just in case they got set to eval For D, which typically doesn't have BN, this shouldn't
+                # matter much.
+                G.train()
+                D.train()
+                if config['ema']:
+                    G_ema.train()
+                
+                x, y = x.to(device), y.to(device).view(-1)
+                x.requires_grad = False
+                y.requires_grad = False
+
+                if config["unet_mixup"]:
+                    # Here we load cutmix masks for every image in the batch
+                    n_mixed = int(x.size(0)/config["num_D_accumulations"])
+                    target_map = torch.cat([CutMix(config["resolution"]).cuda().view(1,1,config["resolution"],config["resolution"]) for _ in range(n_mixed) ],dim=0)
+
+
+                if config["slow_mixup"] and config["full_batch_mixup"]:
+                    # r_mixup is the chance that we select a mixed batch instead of
+                    # a normal batch. This only happens in the setting full_batch_mixup.
+                    # Otherwise the mixed loss is calculated on top of the normal batch.
+                    r_mixup = 0.5 * min(1.0, state_dict["epoch"]/warmup_epochs) # r is at most 50%, after reaching warmup_epochs
+                elif not config["slow_mixup"] and config["full_batch_mixup"]:
+                    r_mixup = 0.5
+                else:
+                    r_mixup = 0.0
+
+                metrics = train(x, y, state_dict["epoch"], batch_size , target_map = target_map, r_mixup = r_mixup)
+
+
+                if (i+1)%200==0:
+                    # print this just to have some peace of mind that the model is training
+                    print("alive and well at ", state_dict['itr'])
+
+                if (i+1)%20==0:
+                    #try:
+                    train_log.log(itr=int(state_dict['itr']),csvlog=csvlogger, **metrics)
+                    #except:
+                    #    print("ouch")
+                
+                # Every sv_log_interval, log singular values
+                if (config['sv_log_interval'] > 0) and (not (state_dict['itr'] % config['sv_log_interval'])):
+
+                    train_log.log(itr=int(state_dict['itr']),csvlog=None,
+                                **{**unet_utils.get_SVs(G, 'G'), **unet_utils.get_SVs(D, 'D')})
+
             
-            x, y = x.to(device), y.to(device).view(-1)
-            x.requires_grad = False
-            y.requires_grad = False
+                # Save weights and copies as configured at specified interval
+                #if not (state_dict['itr'] % config['save_every']):
+                if (i+1)%config['save_every']==0:
 
-            if config["unet_mixup"]:
-                # Here we load cutmix masks for every image in the batch
-                n_mixed = int(x.size(0)/config["num_D_accumulations"])
-                target_map = torch.cat([CutMix(config["resolution"]).cuda().view(1,1,config["resolution"],config["resolution"]) for _ in range(n_mixed) ],dim=0)
+                    if config['G_eval_mode']:
+                        print('Switchin G to eval mode...')
+                        G.eval()
+                        if config['ema']:
+                            G_ema.eval()
+                        train_fns.save_and_sample(G, D, G_ema, z_, y_, fixed_z, fixed_y,
+                                        state_dict, config, experiment_name, sample_only=False)
+                
+                go_ahead_and_sample = ((i+1) % config['sample_every'])==0 
 
+                if go_ahead_and_sample:
 
-            if config["slow_mixup"] and config["full_batch_mixup"]:
-                # r_mixup is the chance that we select a mixed batch instead of
-                # a normal batch. This only happens in the setting full_batch_mixup.
-                # Otherwise the mixed loss is calculated on top of the normal batch.
-                r_mixup = 0.5 * min(1.0, state_dict["epoch"]/warmup_epochs) # r is at most 50%, after reaching warmup_epochs
-            elif not config["slow_mixup"] and config["full_batch_mixup"]:
-                r_mixup = 0.5
-            else:
-                r_mixup = 0.0
+                    if config['G_eval_mode']:
+                        print('Switchin G to eval mode...')
+                        G.eval()
+                        if config['ema']:
+                            G_ema.eval()
 
-            metrics = train(x, y, state_dict["epoch"], batch_size , target_map = target_map, r_mixup = r_mixup)
-
-
-            if (i+1)%200==0:
-                # print this just to have some peace of mind that the model is training
-                print("alive and well at ", state_dict['itr'])
-
-            if (i+1)%20==0:
-                #try:
-                train_log.log(itr=int(state_dict['itr']), **metrics)
-                #except:
-                #    print("ouch")
-            
-            # Every sv_log_interval, log singular values
-            if (config['sv_log_interval'] > 0) and (not (state_dict['itr'] % config['sv_log_interval'])):
-
-                train_log.log(itr=int(state_dict['itr']),
-                             **{**unet_utils.get_SVs(G, 'G'), **unet_utils.get_SVs(D, 'D')})
-
-          
-            # Save weights and copies as configured at specified interval
-            if not (state_dict['itr'] % config['save_every']):
-
-                if config['G_eval_mode']:
-                    print('Switchin G to eval mode...')
-                    G.eval()
-                    if config['ema']:
-                        G_ema.eval()
-                    train_fns.save_and_sample(G, D, G_ema, z_, y_, fixed_z, fixed_y,
-                                      state_dict, config, experiment_name, sample_only=False)
-            
-            go_ahead_and_sample = (not (state_dict['itr'] % config['sample_every']) ) or ( state_dict['itr']<1001 and not (state_dict['itr'] % 100) )
-
-            if go_ahead_and_sample:
-
-                if config['G_eval_mode']:
-                    print('Switchin G to eval mode...')
-                    G.eval()
-                    if config['ema']:
-                        G_ema.eval()
-
-                    train_fns.save_and_sample(G, D, G_ema, z_, y_, fixed_z, fixed_y,
-                                      state_dict, config, experiment_name, sample_only=True)
+                        train_fns.save_and_sample(G, D, G_ema, z_, y_, fixed_z, fixed_y,
+                                        state_dict, config, experiment_name, sample_only=True)
 
 
-                    with torch.no_grad():
-                        real_batch = dataset.fixed_batch()
-                    train_fns.save_and_sample(G, D, G_ema, z_, y_, fixed_z, fixed_y,
-                                      state_dict, config, experiment_name, sample_only=True, use_real = True, real_batch = real_batch)
-                    
-                    # also, visualize mixed images and the decoder predicitions
-                    if config["unet_mixup"]:
                         with torch.no_grad():
-
-                            n = int(min(target_map.size(0), fixed_z.size(0)/2))
-                            which_G = G_ema if config['ema'] and config['use_ema'] else G
-                            unet_utils.accumulate_standing_stats(G_ema if config['ema'] and config['use_ema'] else G,
-                                                                         z_, y_, config['n_classes'],
-                                                                         config['num_standing_accumulations'])
-
                             real_batch = dataset.fixed_batch()
-                            fixed_Gz = nn.parallel.data_parallel(which_G, (fixed_z[:n], which_G.shared(fixed_z[:n]))) #####shouldnt that be fixed_y?
+                        train_fns.save_and_sample(G, D, G_ema, z_, y_, fixed_z, fixed_y,
+                                        state_dict, config, experiment_name, sample_only=True, use_real = True, real_batch = real_batch)
+                        
+                        # also, visualize mixed images and the decoder predicitions
+                        if config["unet_mixup"]:
+                            with torch.no_grad():
 
-                            mixed = target_map[:n]*real_batch[:n]+(1-target_map[:n])*fixed_Gz
-                            train_fns.save_and_sample(G, D, G_ema, z_[:n], y_[:n], fixed_z[:n], fixed_y[:n],
-                                        state_dict, config, experiment_name+"_mix", sample_only=True, use_real = True, real_batch = mixed, mixed=True, target_map = target_map[:n])
-          
+                                n = int(min(target_map.size(0), fixed_z.size(0)/2))
+                                which_G = G_ema if config['ema'] and config['use_ema'] else G
+                                unet_utils.accumulate_standing_stats(G_ema if config['ema'] and config['use_ema'] else G,
+                                                                            z_, y_, config['n_classes'],
+                                                                            config['num_standing_accumulations'])
+
+                                real_batch = dataset.fixed_batch()
+                                fixed_Gz = nn.parallel.data_parallel(which_G, (fixed_z[:n], which_G.shared(fixed_z[:n]))) #####shouldnt that be fixed_y?
+
+                                mixed = target_map[:n]*real_batch[:n]+(1-target_map[:n])*fixed_Gz
+                                train_fns.save_and_sample(G, D, G_ema, z_[:n], y_[:n], fixed_z[:n], fixed_y[:n],
+                                            state_dict, config, experiment_name+"_mix", sample_only=True, use_real = True, real_batch = mixed, mixed=True, target_map = target_map[:n])
+                
             # Test every specified interval
             if not (state_dict['itr'] % config['test_every']):
             #if state_dict['itr'] % 100 == 0:

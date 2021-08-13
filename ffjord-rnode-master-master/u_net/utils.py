@@ -26,6 +26,7 @@ from torch.utils.data import DataLoader
 import logging
 
 import u_net.datasets as dset
+import lib.utils as utils
 
 
 def prepare_parser():
@@ -37,7 +38,7 @@ def prepare_parser():
 
   parser.add_argument("--id",type=str, default="")
   parser.add_argument("--gpus", type=str, default="")
-  parser.add_argument("--sample_every", type=int,default=1000)
+  parser.add_argument("--sample_every", type=int,default=200)
   parser.add_argument("--resume_from", type = str)
   parser.add_argument("--epoch_id", type=str, default="")
   parser.add_argument("--unconditional", action="store_true", default = True)
@@ -51,7 +52,7 @@ def prepare_parser():
   parser.add_argument("--dataloader", type=str, default="celeba128")
   parser.add_argument("--unet_mixup", type=bool, default = True )
 
-  parser.add_argument("--progress_bar", action="store_true", default = False)#use progress bar
+  parser.add_argument("--progress_bar", type=bool, default = True)#use progress bar
   parser.add_argument("--display_mixed_batch", action="store_true", default = False)
   ### Dataset/Dataloader stuff ###
   parser.add_argument(
@@ -235,7 +236,7 @@ def prepare_parser():
 
   ### Bookkeping stuff ###
   parser.add_argument(
-    '--G_eval_mode', action='store_true', default=False,
+    '--G_eval_mode', type=bool, default=True,
     help='Run G in eval mode (running/standing stats?) at sample/test time? '
          '(default: %(default)s)')
   parser.add_argument(
@@ -870,15 +871,14 @@ class MyLogger(object):
     self.root = fname
     if not os.path.exists(self.root):
       os.mkdir(self.root)
-    #if not os.path.exists(self.root[:-6] +'better.'):
-    #  os.mkdir(self.root)
-    #  logger = logging.getLogger()
-    #  level = logging.INFO
-    #  logger.setLevel(level)
-    #  info_file_handler = logging.FileHandler(self.root)
+
     self.reinitialize = reinitialize
     self.metrics = []
+    self.meters = {}
     self.logstyle = logstyle # One of '%3.3f' or like '%3.3e'
+
+    ## Need something for distributed training metrics??
+
 
   # Delete log if re-starting and log already exists
   def reinit(self, item):
@@ -893,15 +893,20 @@ class MyLogger(object):
         os.remove('%s/%s.log' % (self.root, item))
 
   # Log in plaintext; this is designed for being read in MATLAB(sorry not sorry)
-  def log(self, itr, **kwargs):
+  def log(self, itr,csvlog=None, **kwargs):
+
     for arg in kwargs:
+      logdict={'itr':itr}
+      fmt = '{:.4f}'
       if isinstance(kwargs[arg],list):
         mylist = "[ " + ",".join([str(e) for e in kwargs[arg]]) + " ]"
         kwargs[arg] = mylist
+      
       if arg not in self.metrics:
         if self.reinitialize:
           self.reinit(arg)
         self.metrics += [arg]
+        self.meters[arg] = utils.RunningAverageMeter(0.97)
       if self.logstyle == 'pickle':
         print('Pickle not currently supported...')
          # with open('%s/%s.log' % (self.root, arg), 'a') as f:
@@ -914,6 +919,21 @@ class MyLogger(object):
             f.write( str(itr) + ": "  +  kwargs[arg] + "\n")
           else:
             f.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
+      self.meters[arg].update(kwargs[arg])
+      logdict[arg]=fmt.format(kwargs[arg])
+    
+    if csvlog != None:
+      try:
+        csvlog.writerow(logdict)
+      except:
+        try:
+          #csvlog.fieldnames.extend(list(logdict.keys()))
+          csvlog.fieldnames = list(set(csvlog.fieldnames +list(logdict.keys())))
+          csvlog.writerow(logdict)
+        except:
+          print(f'logging failed at itr: {itr}')
+
+
 
 
 # Write some metadata to the logs directory

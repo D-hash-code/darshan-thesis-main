@@ -558,6 +558,7 @@ class G_D(nn.Module):
             try:
                 mixed = target_map*x+(1-target_map)*G_z
             except TypeError:
+                '''
                 print('target_map type: ', type(target_map))
                 print('x type: ', type(x))
                 print('G_z type: ', type(G_z))
@@ -576,6 +577,7 @@ class G_D(nn.Module):
                 print('G_z[0]: ',G_z[2])
 
                 print('G_z: ', G_z[0].shape)
+                '''
                 G_z = G_z[0]
                 mixed = target_map*x+(1-target_map)*G_z
 
@@ -606,7 +608,6 @@ class G_D(nn.Module):
             G_z = None
             x = None
 
-        print('D_input type: ', type(D_input))
         
         D_out, D_middle = self.D(D_input, D_class)
 
