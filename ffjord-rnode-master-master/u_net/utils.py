@@ -920,15 +920,16 @@ class MyLogger(object):
           else:
             f.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
       self.meters[arg].update(kwargs[arg])
-      logdict[arg]=fmt.format(kwargs[arg])
+      logdict[str(arg)]=fmt.format(kwargs[arg])
     
     if csvlog != None:
       try:
+        csvlog.fieldnames = list(set(csvlog.fieldnames +list(logdict.keys())))
         csvlog.writerow(logdict)
       except:
         try:
           #csvlog.fieldnames.extend(list(logdict.keys()))
-          csvlog.fieldnames = list(set(csvlog.fieldnames +list(logdict.keys())))
+          #csvlog.fieldnames = list(set(csvlog.fieldnames +list(logdict.keys())))
           csvlog.writerow(logdict)
         except:
           print(f'logging failed at itr: {itr}')
