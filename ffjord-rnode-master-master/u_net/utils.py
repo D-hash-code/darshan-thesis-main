@@ -259,7 +259,7 @@ def prepare_parser():
     '--test_every', type=int, default=5000,
     help='Test every X iterations (default: %(default)s)')
   parser.add_argument(
-    '--num_inception_images', type=int, default=50000,
+    '--num_inception_images', type=int, default=50,
     help='Number of samples to compute inception metrics with '
          '(default: %(default)s)')
   parser.add_argument(
