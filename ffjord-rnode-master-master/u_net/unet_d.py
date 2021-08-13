@@ -374,7 +374,7 @@ class Generator(nn.Module):
         self.alpha = args.alpha
         self.squeeze_first = args.squeeze_first
         self.cnf_kwargs = {}
-
+        self.shared = layers.identity()
         self.dim_z = 128
         self.resolution = 128
         self.unconditional = True
