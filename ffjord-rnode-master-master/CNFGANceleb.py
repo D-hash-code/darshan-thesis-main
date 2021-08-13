@@ -301,7 +301,7 @@ def run(config,args):
     # Next, build the model
     keys = sorted(config.keys())
     for k in keys:
-        better_logger.info(k, ": ", config[k])
+        better_logger.info(f"{k}: {config[k]}")
 
     
 
@@ -389,7 +389,7 @@ def run(config,args):
         loaders = [data_loader]
 
 
-    better_logger.info("Loaded ", config["dataset"])
+    better_logger.info(f"Loaded {config['dataset']}")
     inception_metrics_dict = {"fid":[],"is_mean": [], "is_std": []}
 
 
@@ -431,7 +431,7 @@ def run(config,args):
     better_logger.info('Iters per train epoch: {}'.format(len(data_loader)))
     ##better_logger.info('Iters per test: {}'.format(len(test_loader)))
 
-    better_logger.info('Beginning training at epoch %d...' % state_dict['epoch'])
+    better_logger.info('Beginning training at epoch {}...'.format(state_dict['epoch']))
 
 
     # Train for specified number of epochs, although we mostly track G iterations.
@@ -496,7 +496,7 @@ def run(config,args):
 
                 if (i+1)%200==0:
                     # print this just to have some peace of mind that the model is training
-                    better_logger.info("alive and well at ", state_dict['itr'])
+                    better_logger.info(f"alive and well at {state_dict['itr']}")
 
                 if (i+1)%20==0:
                     #try:
@@ -581,7 +581,7 @@ def run(config,args):
             if (i + 1) % loss_steps == 0:
                 with open(os.path.join(config["base_root"],"logs/inception_metrics_"+config["random_number_string"]+".p"), "wb") as h:
                     pickle.dump(inception_metrics_dict,h)
-                    better_logger.info("saved FID and IS at", os.path.join(config["base_root"],"logs/inception_metrics_"+config["random_number_string"]+".p") )
+                    better_logger.info(f'saved FID and IS at {os.path.join(config["base_root"],"logs/inception_metrics_"+config["random_number_string"]+".p")}' )
 
 
         # Increment epoch counter at end of epoch
