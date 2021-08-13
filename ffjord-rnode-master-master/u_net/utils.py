@@ -953,7 +953,7 @@ Author: Jan Schlüter
 Andy's adds: time elapsed in addition to ETA, makes it possible to add
 estimated time to 1k iters instead of estimated time to completion.
 """
-def progress(items, desc='', total=None, min_delay=0.1, displaytype='s1k'):
+def progress(items, desc='', total=None, min_delay=0.1, displaytype='s1k',better_logger=None):
   """
   Returns a generator over `items`, printing the number and percentage of
   items processed and the estimated remaining processing time before yielding
@@ -961,34 +961,65 @@ def progress(items, desc='', total=None, min_delay=0.1, displaytype='s1k'):
   has no length), and `min_delay` gives the minimum time in seconds between
   subsequent prints. `desc` gives an optional prefix text (end with a space).
   """
-  total = total or len(items)
-  t_start = time.time()
-  t_last = 0
-  for n, item in enumerate(items):
-    t_now = time.time()
-    if t_now - t_last > min_delay:
-      print("\r%s%d/%d (%6.2f%%)" % (
-              desc, n+1, total, n / float(total) * 100), end=" ")
-      if n > 0:
+  if better_logger==None:
+    total = total or len(items)
+    t_start = time.time()
+    t_last = 0
+    for n, item in enumerate(items):
+      t_now = time.time()
+      if t_now - t_last > min_delay:
+        print("\r%s%d/%d (%6.2f%%)" % (
+                desc, n+1, total, n / float(total) * 100), end=" ")
+        if n > 0:
 
-        if displaytype == 's1k': # minutes/seconds for 1000 iters
-          next_1000 = n + (1000 - n%1000)
-          t_done = t_now - t_start
-          t_1k = t_done / n * next_1000
-          outlist = list(divmod(t_done, 60)) + list(divmod(t_1k - t_done, 60))
-          print("(TE/ET1k: %d:%02d / %d:%02d)" % tuple(outlist), end=" ")
-        else:# displaytype == 'eta':
-          t_done = t_now - t_start
-          t_total = t_done / n * total
-          outlist = list(divmod(t_done, 60)) + list(divmod(t_total - t_done, 60))
-          print("(TE/ETA: %d:%02d / %d:%02d)" % tuple(outlist), end=" ")
+          if displaytype == 's1k': # minutes/seconds for 1000 iters
+            next_1000 = n + (1000 - n%1000)
+            t_done = t_now - t_start
+            t_1k = t_done / n * next_1000
+            outlist = list(divmod(t_done, 60)) + list(divmod(t_1k - t_done, 60))
+            print("(TE/ET1k: %d:%02d / %d:%02d)" % tuple(outlist), end=" ")
+          else:# displaytype == 'eta':
+            t_done = t_now - t_start
+            t_total = t_done / n * total
+            outlist = list(divmod(t_done, 60)) + list(divmod(t_total - t_done, 60))
+            print("(TE/ETA: %d:%02d / %d:%02d)" % tuple(outlist), end=" ")
 
-      sys.stdout.flush()
-      t_last = t_now
-    yield item
-  t_total = time.time() - t_start
-  print("\r%s%d/%d (100.00%%) (took %d:%02d)" % ((desc, total, total) +
-                                                   divmod(t_total, 60)))
+        sys.stdout.flush()
+        t_last = t_now
+      yield item
+    t_total = time.time() - t_start
+    print("\r%s%d/%d (100.00%%) (took %d:%02d)" % ((desc, total, total) +
+                                                    divmod(t_total, 60)))
+                                            
+  else:
+    total = total or len(items)
+    t_start = time.time()
+    t_last = 0
+    for n, item in enumerate(items):
+      t_now = time.time()
+      if t_now - t_last > min_delay:
+        better_logger.info("\r%s%d/%d (%6.2f%%)" % (
+                desc, n+1, total, n / float(total) * 100), end=" ")
+        if n > 0:
+
+          if displaytype == 's1k': # minutes/seconds for 1000 iters
+            next_1000 = n + (1000 - n%1000)
+            t_done = t_now - t_start
+            t_1k = t_done / n * next_1000
+            outlist = list(divmod(t_done, 60)) + list(divmod(t_1k - t_done, 60))
+            better_logger.info("(TE/ET1k: %d:%02d / %d:%02d)" % tuple(outlist), end=" ")
+          else:# displaytype == 'eta':
+            t_done = t_now - t_start
+            t_total = t_done / n * total
+            outlist = list(divmod(t_done, 60)) + list(divmod(t_total - t_done, 60))
+            better_logger.info("(TE/ETA: %d:%02d / %d:%02d)" % tuple(outlist), end=" ")
+
+        sys.stdout.flush()
+        t_last = t_now
+      yield item
+    t_total = time.time() - t_start
+    better_logger.info("\r%s%d/%d (100.00%%) (took %d:%02d)" % ((desc, total, total) +
+                                                    divmod(t_total, 60)))
 
 
 # Sample function for use with inception metrics

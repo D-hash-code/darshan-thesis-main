@@ -301,7 +301,7 @@ def run(config,args):
     # Next, build the model
     keys = sorted(config.keys())
     for k in keys:
-        print(k, ": ", config[k])
+        better_logger.info(k, ": ", config[k])
 
     
 
@@ -316,9 +316,9 @@ def run(config,args):
 
     GD = model.G_D(G, D, config)
 
-    print(G)
-    print(D)
-    print('Number of params in G: {} D: {}'.format(
+    better_logger.info(G)
+    better_logger.info(D)
+    better_logger.info('Number of params in G: {} D: {}'.format(
     *[sum([p.data.nelement() for p in net.parameters()]) for net in [G,D]]))
 
     # Prepare noise and randomly sampled label arrays Allow for different batch sizes in G
@@ -334,7 +334,7 @@ def run(config,args):
         GD = nn.DataParallel(GD)
 
     if config['resume']:
-        print('Loading weights...')
+        better_logger.info('Loading weights...')
         if config["epoch_id"] !="":
             epoch_id = config["epoch_id"]
 
@@ -352,16 +352,16 @@ def run(config,args):
                              None)
             G_ema.load_state_dict(G.state_dict())
 
-        print("loaded weigths")
+        better_logger.info("loaded weigths")
     
     # Prepare loggers for stats; metrics holds test metrics, lmetrics holds any desired training metrics.
     test_metrics_fname = '%s/%s_log.jsonl' % (config['logs_root'],
                                             experiment_name)
     train_metrics_fname = '%s/%s' % (config['logs_root'], experiment_name)
-    print('Inception Metrics will be saved to {}'.format(test_metrics_fname))
+    better_logger.info('Inception Metrics will be saved to {}'.format(test_metrics_fname))
     test_log = unet_utils.MetricsLogger(test_metrics_fname,
                                  reinitialize=(not config['resume']))
-    print('Training Metrics will be saved to {}'.format(train_metrics_fname))
+    better_logger.info('Training Metrics will be saved to {}'.format(train_metrics_fname))
     train_log = unet_utils.MyLogger(train_metrics_fname,
                              reinitialize=(not config['resume']),
                              logstyle=config['logstyle'])
@@ -389,7 +389,7 @@ def run(config,args):
         loaders = [data_loader]
 
 
-    print("Loaded ", config["dataset"])
+    better_logger.info("Loaded ", config["dataset"])
     inception_metrics_dict = {"fid":[],"is_mean": [], "is_std": []}
 
 
@@ -431,7 +431,7 @@ def run(config,args):
     better_logger.info('Iters per train epoch: {}'.format(len(data_loader)))
     ##better_logger.info('Iters per test: {}'.format(len(test_loader)))
 
-    print('Beginning training at epoch %d...' % state_dict['epoch'])
+    better_logger.info('Beginning training at epoch %d...' % state_dict['epoch'])
 
 
     # Train for specified number of epochs, although we mostly track G iterations.
@@ -441,7 +441,7 @@ def run(config,args):
     for epoch in range(state_dict['epoch'], config['num_epochs']):
         if config["progress_bar"]:
             if config['pbar'] == 'mine':
-                pbar = unet_utils.progress(loaders[0],displaytype='s1k' if config['use_multiepoch_sampler'] else 'eta')
+                pbar = unet_utils.progress(loaders[0],displaytype='s1k' if config['use_multiepoch_sampler'] else 'eta',better_logger=better_logger)
             else:
                 pbar = tqdm(loaders[0])
         else:
@@ -462,7 +462,7 @@ def run(config,args):
                 # Increment the iteration counter
                 state_dict['itr'] += 1
                 if config["debug"] and state_dict['itr']>config["stop_it"]:
-                    print("code didn't break :)")
+                    better_logger.info("code didn't break :)")
                     break
                 # Make sure G and D are in training mode, just in case they got set to eval For D, which typically doesn't have BN, this shouldn't
                 # matter much.
@@ -496,7 +496,7 @@ def run(config,args):
 
                 if (i+1)%200==0:
                     # print this just to have some peace of mind that the model is training
-                    print("alive and well at ", state_dict['itr'])
+                    better_logger.info("alive and well at ", state_dict['itr'])
 
                 if (i+1)%20==0:
                     #try:
@@ -516,7 +516,7 @@ def run(config,args):
                 if (i+1)%config['save_every']==0:
 
                     if config['G_eval_mode']:
-                        print('Switchin G to eval mode...')
+                        better_logger.info('Switchin G to eval mode...')
                         G.eval()
                         if config['ema']:
                             G_ema.eval()
@@ -528,7 +528,7 @@ def run(config,args):
                 if go_ahead_and_sample:
 
                     if config['G_eval_mode']:
-                        print('Switchin G to eval mode...')
+                        better_logger.info('Switchin G to eval mode...')
                         G.eval()
                         if config['ema']:
                             G_ema.eval()
@@ -563,7 +563,7 @@ def run(config,args):
             if ((i+1) % config['test_every'])==0:
             #if state_dict['itr'] % 100 == 0:
                 if config['G_eval_mode']:
-                  print('Switchin G to eval mode...')
+                  better_logger.info('Switchin G to eval mode...')
 
                 is_mean, is_std , fid = train_fns.test(G, D, G_ema, z_, y_, state_dict, config, sample, get_inception_metrics , experiment_name, test_log, moments = "train")
                 ###
@@ -581,7 +581,7 @@ def run(config,args):
             if (i + 1) % loss_steps == 0:
                 with open(os.path.join(config["base_root"],"logs/inception_metrics_"+config["random_number_string"]+".p"), "wb") as h:
                     pickle.dump(inception_metrics_dict,h)
-                    print("saved FID and IS at", os.path.join(config["base_root"],"logs/inception_metrics_"+config["random_number_string"]+".p") )
+                    better_logger.info("saved FID and IS at", os.path.join(config["base_root"],"logs/inception_metrics_"+config["random_number_string"]+".p") )
 
 
         # Increment epoch counter at end of epoch
