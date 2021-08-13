@@ -548,9 +548,9 @@ def run(config,args):
 
                                 n = int(min(target_map.size(0), fixed_z.size(0)/2))
                                 which_G = G_ema if config['ema'] and config['use_ema'] else G
-                                unet_utils.accumulate_standing_stats(G_ema if config['ema'] and config['use_ema'] else G,
-                                                                            z_, y_, config['n_classes'],
-                                                                            config['num_standing_accumulations'])
+                                #unet_utils.accumulate_standing_stats(G_ema if config['ema'] and config['use_ema'] else G,
+                                #                                            z_, y_, config['n_classes'],
+                                #                                            config['num_standing_accumulations'])
 
                                 real_batch = dataset.fixed_batch()
                                 fixed_Gz = nn.parallel.data_parallel(which_G, (fixed_z[:n], which_G.shared(fixed_z[:n]))) #####shouldnt that be fixed_y?
