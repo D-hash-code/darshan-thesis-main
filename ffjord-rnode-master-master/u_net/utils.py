@@ -227,7 +227,7 @@ def prepare_parser():
     help='Train with half-precision activations but fp32 params in G? '
          '(default: %(default)s)')
   parser.add_argument(
-    '--accumulate_stats', type=bool, default=True,
+    '--accumulate_stats', type=bool, default=False,
     help='Accumulate "standing" batchnorm stats? (default: %(default)s)')
   parser.add_argument(
     '--num_standing_accumulations', type=int, default=100,
@@ -1273,7 +1273,7 @@ def accumulate_standing_stats(net, z, y, nclasses, num_accumulations=16):
     with torch.no_grad():
       z.normal_()
       y.random_(0, nclasses)
-      x = net(z, net.shared(y)) # No need to parallelize here unless using syncbn
+      x = net(z, y) # No need to parallelize here unless using syncbn
   # Set to eval mode
   net.eval()
 
