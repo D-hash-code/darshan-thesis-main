@@ -58,7 +58,7 @@ class CNF(nn.Module):
                 state_t = odeint(
                     self.odefunc,
                     (z, _logpz) + reg_states,
-                    integration_times.to(z),
+                    integration_times.to(z) if integration_times.device!=z.device else integration_times,
                     atol=[self.atol, self.atol] + [1e20] * len(reg_states) if self.solver in ['dopri5', 'bosh3'] else self.atol,
                     rtol=[self.rtol, self.rtol] + [1e20] * len(reg_states) if self.solver in ['dopri5', 'bosh3'] else self.rtol,
                     method=self.solver,
