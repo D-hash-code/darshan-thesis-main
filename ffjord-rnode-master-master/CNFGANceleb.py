@@ -290,13 +290,6 @@ def run(config,args):
     traincolumns = ['itr'] ##lg
     testcolumns = ['epoch'] ##lg
 
-    if not args.resume:
-        with open(better_trainlog,'w') as f:
-            csvlogger = csv.DictWriter(f, traincolumns)
-            csvlogger.writeheader()
-        with open(better_testlog,'w') as f:
-            csvlogger = csv.DictWriter(f, testcolumns)
-            csvlogger.writeheader()
 
     # Next, build the model
     keys = sorted(config.keys())
@@ -429,19 +422,20 @@ def run(config,args):
     better_logger.info("Number of trainable parameters in Generator CNF: {}".format(count_parameters(G)))
     better_logger.info("Number of trainable parameters in U-Net Discriminator: {}".format(count_parameters(D)))
     better_logger.info('Iters per train epoch: {}'.format(len(data_loader)))
-    ##better_logger.info('Iters per test: {}'.format(len(test_loader)))
 
     better_logger.info('Beginning training at epoch {}...'.format(state_dict['epoch']))
 
 
     # Train for specified number of epochs, although we mostly track G iterations.
     warmup_epochs = config["warmup_epochs"]
-    with open(better_trainlog,'a') as f:
-        csvlogger = csv.DictWriter(f,train_log.logdict_train.keys())
-        csvlogger.writeheader()
-    with open(better_testlog,'a') as f:
-        csvlogger = csv.DictWriter(f,train_log.logdict_test.keys())
-        csvlogger.writeheader()
+
+    if not args.resume:
+        with open(better_trainlog,'a') as f:
+            csvlogger = csv.DictWriter(f,train_log.logdict_train.keys())
+            csvlogger.writeheader()
+        with open(better_testlog,'a') as f:
+            csvlogger = csv.DictWriter(f,train_log.logdict_test.keys())
+            csvlogger.writeheader()
 
     for epoch in range(state_dict['epoch'], config['num_epochs']):
         if config["progress_bar"]:
