@@ -338,14 +338,14 @@ class ODEfunc(nn.Module):
                 divergence = divergence.view(batchsize, 1)
                 self.sqjacnorm = sqjacnorm
             
-            print('states[:2][:1].size: ',states[:2][0].size())
+            #states[:2][:1].size = batch size, channels, height, width
             if self.residual:
                 dy = dy - y
                 divergence -= torch.ones_like(divergence) * torch.tensor(np.prod(y.shape[1:]), dtype=torch.float32
                                                                         ).to(divergence)
-            out = tuple([dy, -divergence] + [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]])
-            print('out tuple len: ', len(out))
-            print('out: ', out)
+            out = tuple([dy, -divergence] + [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]]) 
+            #out tuple len = 2 ; both elements are tensors, the second tensor is [[-0],[-0],[-0]]
+            print('out[0].size: ', out[0].size())
             return out
         
 
