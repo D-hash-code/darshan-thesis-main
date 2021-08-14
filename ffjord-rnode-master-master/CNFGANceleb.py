@@ -436,7 +436,12 @@ def run(config,args):
 
     # Train for specified number of epochs, although we mostly track G iterations.
     warmup_epochs = config["warmup_epochs"]
-
+    with open(better_trainlog,'a') as f:
+        csvlogger = csv.DictWriter(f,train_log.logdict_train.keys())
+        csvlogger.writeheader()
+    with open(better_testlog,'a') as f:
+        csvlogger = csv.DictWriter(f,train_log.logdict_test.keys())
+        csvlogger.writeheader()
 
     for epoch in range(state_dict['epoch'], config['num_epochs']):
         if config["progress_bar"]:
@@ -566,7 +571,7 @@ def run(config,args):
                 if config['G_eval_mode']:
                   better_logger.info('Switchin G to eval mode...')
 
-                is_mean, is_std , fid = train_fns.test(G, D, G_ema, z_, y_, state_dict, config, sample, get_inception_metrics , experiment_name, test_log, moments = "train")
+                is_mean, is_std , fid = train_fns.test(G, D, G_ema, z_, y_, state_dict, config, sample, get_inception_metrics , experiment_name, test_log, moments = "train",better_testlog=better_testlog)
                 ###
                 #  Here, the bn statistics are updated
                 ###
