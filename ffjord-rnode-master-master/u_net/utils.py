@@ -187,7 +187,7 @@ def prepare_parser():
 
   ### Batch size, parallel, and precision stuff ###
   parser.add_argument(
-    '--batch_size', type=int, default=3,
+    '--batch_size', type=int, default=200,
     help='Default overall batchsize (default: %(default)s)')
   parser.add_argument(
     '--G_batch_size', type=int, default=0,
