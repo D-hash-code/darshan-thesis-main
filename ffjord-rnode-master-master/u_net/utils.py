@@ -878,6 +878,7 @@ class MyLogger(object):
     self.logstyle = logstyle # One of '%3.3f' or like '%3.3e'
     self.csvlog_fieldnames = []
     self.csvlog = None
+    self.logdict = {}
 
     ## Need something for distributed training metrics??
 
@@ -898,9 +899,9 @@ class MyLogger(object):
   def log(self, itr, **kwargs):
 
     for arg in kwargs:
-      logdict={'itr':itr}
+      self.logdict={'itr':itr}
       print('arg: ', arg)
-      print('logdict: ',logdict)
+      print('logdict: ',self.logdict)
       fmt = '{:.4f}'
       if isinstance(kwargs[arg],list):
         mylist = "[ " + ",".join([str(e) for e in kwargs[arg]]) + " ]"
@@ -929,18 +930,18 @@ class MyLogger(object):
             g.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
       
       self.meters[str(arg)].update(kwargs[arg])
-      logdict[str(arg)]=fmt.format(kwargs[arg])
+      self.logdict[str(arg)]=fmt.format(kwargs[arg])
     
     if self.csvlog != None:
       try:
-        self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(logdict.keys())))
-        self.csvlog.writerow(logdict)
+        self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(self.logdict.keys())))
+        self.csvlog.writerow(self.logdict)
         self.csvlog_fieldnames = self.csvlog.fieldnames
       except:
         try:
-          self.csvlog.fieldnames.extend(list(logdict.keys()))
-          self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(logdict.keys())))
-          self.csvlog.writerow(logdict)
+          self.csvlog.fieldnames.extend(list(self.logdict.keys()))
+          self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(self.logdict.keys())))
+          self.csvlog.writerow(self.logdict)
           self.csvlog_fieldnames = self.csvlog.fieldnames
         except:
           print(f'logging failed at itr: {itr}')
