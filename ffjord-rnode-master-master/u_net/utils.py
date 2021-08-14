@@ -899,7 +899,7 @@ class MyLogger(object):
   def log(self, itr, **kwargs):
 
     for arg in kwargs:
-      self.logdict={'itr':itr}
+      self.logdict['itr'] = itr
       print('arg: ', arg)
       print('logdict: ',self.logdict)
       fmt = '{:.4f}'
