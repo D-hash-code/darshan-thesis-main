@@ -900,15 +900,15 @@ class MyLogger(object):
 
     for arg in kwargs:
       self.logdict['itr'] = itr
-      print('arg: ', arg)
-      print('logdict: ',self.logdict)
+      #print('arg: ', arg)
+      #print('logdict: ',self.logdict)
       fmt = '{:.4f}'
       if isinstance(kwargs[arg],list):
         mylist = "[ " + ",".join([str(e) for e in kwargs[arg]]) + " ]"
         kwargs[arg] = mylist
       
-      if str(arg) not in self.meters.keys():
-        self.meters[str(arg)] = utils.RunningAverageMeter(0.97)
+      if arg not in self.meters.keys():
+        self.meters[arg] = utils.RunningAverageMeter(0.97)
 
 
       if arg not in self.metrics:
@@ -929,8 +929,8 @@ class MyLogger(object):
           else:
             g.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
       
-      self.meters[str(arg)].update(kwargs[arg])
-      self.logdict[str(arg)]=fmt.format(kwargs[arg])
+      self.meters[arg].update(kwargs[arg])
+      self.logdict[arg]=fmt.format(kwargs[arg])
       #if self.csvlog != None:
       #  if str(arg) not in self.csvlog.fieldnames:
       #    self.csvlog.fieldnames.extend(str(arg))
