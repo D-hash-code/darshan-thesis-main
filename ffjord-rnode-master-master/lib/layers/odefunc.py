@@ -334,7 +334,7 @@ class ODEfunc(nn.Module):
 
                 dy = self.diffeq(t, y)
 
-            div_out = -torch.zeros(3,1)
+            div_out = -torch.zeros(3,1).to(dy)
             #states[:2][:1].size = batch size, channels, height, width
             if self.residual:
                 dy = dy - y
