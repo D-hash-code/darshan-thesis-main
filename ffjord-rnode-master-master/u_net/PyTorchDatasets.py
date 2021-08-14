@@ -273,11 +273,11 @@ class Celeba(VisionDataset):
         
         self.transform = transform
         self.return_all = return_all
-        all_files = os.listdir(self.root)
+        self.all_files = os.listdir(self.root)
         #all_files = []
         #for i in range(1,202600): #
         #    all_files.append(str(i).zfill(6) + '.png')
-        self.length = len(all_files)
+        self.length = len(self.all_files)
         self.fixed_transform = transforms.Compose(
                 [ transforms.Resize(imsize),
                     transforms.CenterCrop(imsize),
@@ -305,7 +305,8 @@ class Celeba(VisionDataset):
 
     def random_batch(self,index, fixed=False):
 
-        file = str(index+1).zfill(6) + '.png'
+        #file = str(index+1).zfill(6) + '.png'
+        file = self.all_files[index+1]
         image_path = os.path.join(self.root, file )
         img = Image.open( image_path).convert('RGB')
         if fixed:
