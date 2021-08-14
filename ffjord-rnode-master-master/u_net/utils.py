@@ -904,6 +904,8 @@ class MyLogger(object):
         mylist = "[ " + ",".join([str(e) for e in kwargs[arg]]) + " ]"
         kwargs[arg] = mylist
       
+      #if arg not in logdict.keys():
+
       if arg not in self.metrics:
         if self.reinitialize:
           self.reinit(arg)
@@ -923,7 +925,8 @@ class MyLogger(object):
             g.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
       if not isinstance(kwargs[arg],list):
         self.meters[arg].update(kwargs[arg])
-        logdict[str(arg)]=fmt.format(kwargs[arg])
+        logdict[arg]=fmt.format(kwargs[arg])
+        self.csvlog_fieldnames = csvlog.fieldnames
     
     if csvlog != None:
       try:
@@ -932,9 +935,10 @@ class MyLogger(object):
         self.csvlog_fieldnames = csvlog.fieldnames
       except:
         try:
-          #csvlog.fieldnames.extend(list(logdict.keys()))
-          #csvlog.fieldnames = list(set(csvlog.fieldnames +list(logdict.keys())))
+          csvlog.fieldnames.extend(list(logdict.keys()))
+          csvlog.fieldnames = list(set(csvlog.fieldnames +list(logdict.keys())))
           csvlog.writerow(logdict)
+          self.csvlog_fieldnames = csvlog.fieldnames
         except:
           print(f'logging failed at itr: {itr}')
 
