@@ -332,11 +332,19 @@ class ODEfunc(nn.Module):
                 for s_ in states[2:]:
                     s_.requires_grad_(True)
                 
+                print('*states[2:]: ', *states[2:])
                 dy = self.diffeq(t, y, *states[2:])
-                
                 divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
                 divergence = divergence.view(batchsize, 1)
                 self.sqjacnorm = sqjacnorm
+                i=1
+                while i<0:
+                    divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
+                    divergence = divergence.view(batchsize, 1)
+                    self.sqjacnorm = sqjacnorm
+                    i=1
+                    self.divout = -divergence
+                    self.statout = states[2:]
             
             #states[:2][:1].size = batch size, channels, height, width
             if self.residual:
@@ -344,9 +352,9 @@ class ODEfunc(nn.Module):
                 divergence -= torch.ones_like(divergence) * torch.tensor(np.prod(y.shape[1:]), dtype=torch.float32
                                                                         ).to(divergence)
             out = tuple([dy, -divergence] + [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]]) 
-            print('dy,-divergence: ', [dy, -divergence])
-            print('dy size: ', dy.size())
-            print('2nd list ', [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]])
+            #print('dy,-divergence: ', [dy, -divergence])
+            #dy size: batch size, channels, height, width
+            #print('2nd list ', [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]]) EMPTY LIST !!! -> []
 
             #out tuple len = 2 ; both elements are tensors, the second tensor is [[-0],[-0],[-0]]
             #out[0].size = batch size, channels, height, width
