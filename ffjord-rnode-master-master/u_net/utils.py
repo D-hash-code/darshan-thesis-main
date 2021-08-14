@@ -931,20 +931,16 @@ class MyLogger(object):
       
       self.meters[str(arg)].update(kwargs[arg])
       self.logdict[str(arg)]=fmt.format(kwargs[arg])
+      if self.csvlog != None:
+        if str(arg) not in self.csvlog.fieldnames:
+          self.csvlog.fieldnames.extend(str(arg))
+          self.csvlog_fieldnames.extend(str(arg))
     
     if self.csvlog != None:
       try:
-        self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(self.logdict.keys())))
         self.csvlog.writerow(self.logdict)
-        self.csvlog_fieldnames = self.csvlog.fieldnames
       except:
-        try:
-          self.csvlog.fieldnames.extend(list(self.logdict.keys()))
-          self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(self.logdict.keys())))
-          self.csvlog.writerow(self.logdict)
-          self.csvlog_fieldnames = self.csvlog.fieldnames
-        except:
-          print(f'logging failed at itr: {itr}')
+        print(f'logging failed at itr: {itr}')
 
 
 
