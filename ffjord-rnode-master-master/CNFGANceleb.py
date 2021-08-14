@@ -455,6 +455,7 @@ def run(config,args):
 
             with open(better_trainlog,'a') as f:
                 csvlogger = csv.DictWriter(f,train_log.csvlog_fieldnames)
+                train_log.csvlog = csvlogger
                 x = batch_data[0]
                 y = batch_data[1]
                 #H = batch_data[2]

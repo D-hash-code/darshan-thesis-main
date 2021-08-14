@@ -877,6 +877,7 @@ class MyLogger(object):
     self.meters = {}
     self.logstyle = logstyle # One of '%3.3f' or like '%3.3e'
     self.csvlog_fieldnames = []
+    self.csvlog = None
 
     ## Need something for distributed training metrics??
 
@@ -894,7 +895,7 @@ class MyLogger(object):
         os.remove('%s/%s.log' % (self.root, item))
 
   # Log in plaintext; this is designed for being read in MATLAB(sorry not sorry)
-  def log(self, itr,csvlog=None, **kwargs):
+  def log(self, itr, **kwargs):
 
     for arg in kwargs:
       logdict={'itr':itr}
@@ -927,17 +928,17 @@ class MyLogger(object):
         self.meters[arg].update(kwargs[arg])
         logdict[arg]=fmt.format(kwargs[arg])
     
-    if csvlog != None:
+    if self.csvlog != None:
       try:
-        csvlog.fieldnames = list(set(csvlog.fieldnames +list(logdict.keys())))
-        csvlog.writerow(logdict)
-        self.csvlog_fieldnames = csvlog.fieldnames
+        self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(logdict.keys())))
+        self.csvlog.writerow(logdict)
+        self.csvlog_fieldnames = self.csvlog.fieldnames
       except:
         try:
-          csvlog.fieldnames.extend(list(logdict.keys()))
-          csvlog.fieldnames = list(set(csvlog.fieldnames +list(logdict.keys())))
-          csvlog.writerow(logdict)
-          self.csvlog_fieldnames = csvlog.fieldnames
+          self.csvlog.fieldnames.extend(list(logdict.keys()))
+          self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(logdict.keys())))
+          self.csvlog.writerow(logdict)
+          self.csvlog_fieldnames = self.csvlog.fieldnames
         except:
           print(f'logging failed at itr: {itr}')
 
@@ -1005,9 +1006,7 @@ def progress(items, desc='', total=None, min_delay=0.1, displaytype='s1k',better
     for n, item in enumerate(items):
       t_now = time.time()
       if t_now - t_last > min_delay:
-        better_logger.info("\r%s%d/%d (%6.2f%%)" % (desc, n+1, total, n / float(total) * 100))
         if n > 0:
-
           if displaytype == 's1k': # minutes/seconds for 1000 iters
             next_1000 = n + (1000 - n%1000)
             t_done = t_now - t_start
