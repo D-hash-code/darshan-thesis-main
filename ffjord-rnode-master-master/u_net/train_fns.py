@@ -454,8 +454,7 @@ def test(G, D, G_ema, z_, y_, state_dict, config, sample, get_inception_metrics,
     # If improved over previous best metric, save approrpiate copy
     if better_testlog!=None:
         with open(better_testlog,'a') as b:
-            csvlogger_test = csv.DictWriter(b,test_log.logdict_test.keys())
-            test_log.csvlog = csvlogger_test
+            csvlogger_test = csv.DictWriter(b)
             if moments=="train":
                 if ((config['which_best'] == 'IS' and IS_mean > state_dict['best_IS'])
                     or (config['which_best'] == 'FID' and FID < state_dict['best_FID'])):
@@ -469,6 +468,9 @@ def test(G, D, G_ema, z_, y_, state_dict, config, sample, get_inception_metrics,
                 # Log results to file
                 test_log.log(itr=int(state_dict['itr']), IS_mean=float(IS_mean),
                                         IS_std=float(IS_std), FID=float(FID))
+                
+                l_dict = {'itr':int(state_dict['itr']), 'IS_mean':float(IS_mean),'IS_std':float(IS_std), 'FID':float(FID)}
+                csvlogger_test.writerow(l_dict)
             elif moments=="test":
                 if ((config['which_best'] == 'IS' and IS_mean > state_dict['best_IS_test'])
                     or (config['which_best'] == 'FID' and FID < state_dict['best_FID_test'])):
@@ -483,6 +485,9 @@ def test(G, D, G_ema, z_, y_, state_dict, config, sample, get_inception_metrics,
                 # Log results to file
                 test_log.log(itr=int(state_dict['itr']), IS_mean_test=float(IS_mean),
                                         IS_std_test=float(IS_std), FID_test=float(FID))
+                
+                l_dict = {'itr':int(state_dict['itr']), 'IS_mean':float(IS_mean),'IS_std':float(IS_std), 'FID':float(FID)}
+                csvlogger_test.writerow(l_dict)
     else:
         if moments=="train":
             if ((config['which_best'] == 'IS' and IS_mean > state_dict['best_IS'])
