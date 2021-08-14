@@ -898,6 +898,7 @@ class MyLogger(object):
 
     for arg in kwargs:
       logdict={'itr':itr}
+      print('logdict: ',logdict)
       fmt = '{:.4f}'
       if isinstance(kwargs[arg],list):
         mylist = "[ " + ",".join([str(e) for e in kwargs[arg]]) + " ]"
