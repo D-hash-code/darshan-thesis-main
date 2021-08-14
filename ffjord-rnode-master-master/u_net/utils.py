@@ -926,7 +926,6 @@ class MyLogger(object):
       if not isinstance(kwargs[arg],list):
         self.meters[arg].update(kwargs[arg])
         logdict[arg]=fmt.format(kwargs[arg])
-        self.csvlog_fieldnames = csvlog.fieldnames
     
     if csvlog != None:
       try:
@@ -1014,12 +1013,12 @@ def progress(items, desc='', total=None, min_delay=0.1, displaytype='s1k',better
             t_done = t_now - t_start
             t_1k = t_done / n * next_1000
             outlist = list(divmod(t_done, 60)) + list(divmod(t_1k - t_done, 60))
-            better_logger.info("(TE/ET1k: %d:%02d / %d:%02d)" % tuple(outlist))
+            better_logger.info("\r%s%d/%d (%6.2f%%): (TE/ET1k: %d:%02d / %d:%02d)" % ((desc, n+1, total, n / float(total) * 100) + tuple(outlist)))
           else:# displaytype == 'eta':
             t_done = t_now - t_start
             t_total = t_done / n * total
             outlist = list(divmod(t_done, 60)) + list(divmod(t_total - t_done, 60))
-            better_logger.info("(TE/ETA: %d:%02d / %d:%02d)" % tuple(outlist))
+            better_logger.info("\r%s%d/%d (%6.2f%%): (TE/ETA: %d:%02d / %d:%02d)" % ((desc, n+1, total, n / float(total) * 100) + tuple(outlist)))
 
         sys.stdout.flush()
         t_last = t_now
