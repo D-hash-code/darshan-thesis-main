@@ -905,13 +905,15 @@ class MyLogger(object):
         mylist = "[ " + ",".join([str(e) for e in kwargs[arg]]) + " ]"
         kwargs[arg] = mylist
       
-      #if arg not in logdict.keys():
+      if str(arg) not in self.meters.keys():
+        self.meters[str(arg)] = utils.RunningAverageMeter(0.97)
+
 
       if arg not in self.metrics:
         if self.reinitialize:
           self.reinit(arg)
         self.metrics += [arg]
-        self.meters[arg] = utils.RunningAverageMeter(0.97)
+        
       if self.logstyle == 'pickle':
         print('Pickle not currently supported...')
          # with open('%s/%s.log' % (self.root, arg), 'a') as f:
@@ -924,9 +926,9 @@ class MyLogger(object):
             g.write( str(itr) + ": "  +  kwargs[arg] + "\n")
           else:
             g.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
-      if not isinstance(kwargs[arg],list):
-        self.meters[arg].update(kwargs[arg])
-        logdict[arg]=fmt.format(kwargs[arg])
+      
+      self.meters[str(arg)].update(kwargs[arg])
+      logdict[str(arg)]=fmt.format(kwargs[arg])
     
     if self.csvlog != None:
       try:
