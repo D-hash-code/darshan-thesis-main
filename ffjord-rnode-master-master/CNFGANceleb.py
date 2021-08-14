@@ -501,14 +501,14 @@ def run(config,args):
 
                 if (i+1)%20==0:
                     #try:
-                    train_log.log(itr=int(state_dict['itr']),csvlog=csvlogger, **metrics)
+                    train_log.log(itr=int(state_dict['itr']), **metrics)
                     #except:
                     #    print("ouch")
                 
                 # Every sv_log_interval, log singular values
                 if (config['sv_log_interval'] > 0) and (not (state_dict['itr'] % config['sv_log_interval'])):
 
-                    train_log.log(itr=int(state_dict['itr']),csvlog=None,
+                    train_log.log(itr=int(state_dict['itr']),
                                 **{**unet_utils.get_SVs(G, 'G'), **unet_utils.get_SVs(D, 'D')})
 
             
