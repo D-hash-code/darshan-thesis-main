@@ -320,36 +320,27 @@ class ODEfunc(nn.Module):
             batchsize = y.shape[0]
 
             # Sample and fix the noise.
-            if self._e is None:
-                if self.rademacher:
-                    self._e = [sample_rademacher_like(y) for k in range(self.div_samples)]
-                else:
-                    self._e = [sample_gaussian_like(y) for k in range(self.div_samples)]
+            #if self._e is None:
+            #    if self.rademacher:
+            #        self._e = [sample_rademacher_like(y) for k in range(self.div_samples)]
+            #    else:
+            #        self._e = [sample_gaussian_like(y) for k in range(self.div_samples)]
 
             with torch.set_grad_enabled(True):
                 y.requires_grad_(True)
                 t.requires_grad_(True)
                 for s_ in states[2:]:
                     s_.requires_grad_(True)
-                i=0
-                if i<0:
-                    self.statout= states[2:]
-                dy = self.diffeq(t, y, *self.statout)
-                
-                if i<0:
-                    divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
-                    divergence = divergence.view(batchsize, 1)
-                    self.sqjacnorm = sqjacnorm
-                    self.divout = -divergence
-                    self.statout = states[2:]
-                    i=1
-            
+
+                dy = self.diffeq(t, y)
+
+            div_out = -torch.zeros(3,1)
             #states[:2][:1].size = batch size, channels, height, width
             if self.residual:
                 dy = dy - y
                 divergence -= torch.ones_like(divergence) * torch.tensor(np.prod(y.shape[1:]), dtype=torch.float32
                                                                         ).to(divergence)
-            out = tuple([dy, self.divout] + [torch.zeros_like(s_).requires_grad_(True) for s_ in self.statout]) 
+            out = tuple([dy, div_out]) 
             #print('dy,-divergence: ', [dy, -divergence])
             #dy size: batch size, channels, height, width
             #print('2nd list ', [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]]) EMPTY LIST !!! -> []
