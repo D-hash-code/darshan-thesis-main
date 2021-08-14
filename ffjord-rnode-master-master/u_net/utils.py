@@ -938,9 +938,20 @@ class MyLogger(object):
     
     if self.csvlog != None:
       try:
+
+
+        self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(self.logdict.keys())))
+        self.csvlog.writeheader()
         self.csvlog.writerow(self.logdict)
+        self.csvlog_fieldnames = self.csvlog.fieldnames
       except:
-        print(f'logging failed at itr: {itr}')
+        try:
+          self.csvlog.fieldnames.extend(list(self.logdict.keys()))
+          self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(self.logdict.keys())))
+          self.csvlog.writerow(self.logdict)
+          self.csvlog_fieldnames = self.csvlog.fieldnames
+        except:
+          print(f'logging failed at itr: {itr}')
 
 
 
