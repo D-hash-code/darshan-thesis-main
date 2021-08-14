@@ -332,11 +332,11 @@ class ODEfunc(nn.Module):
                 for s_ in states[2:]:
                     s_.requires_grad_(True)
                 i=0
-                while i<0:
+                if i<0:
                     self.statout= states[2:]
                 dy = self.diffeq(t, y, *self.statout)
                 
-                while i<0:
+                if i<0:
                     divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
                     divergence = divergence.view(batchsize, 1)
                     self.sqjacnorm = sqjacnorm
