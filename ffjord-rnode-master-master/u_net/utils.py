@@ -899,6 +899,7 @@ class MyLogger(object):
 
     for arg in kwargs:
       logdict={'itr':itr}
+      print('arg: ', arg)
       print('logdict: ',logdict)
       fmt = '{:.4f}'
       if isinstance(kwargs[arg],list):
