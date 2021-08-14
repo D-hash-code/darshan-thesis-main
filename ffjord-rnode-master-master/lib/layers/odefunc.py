@@ -338,7 +338,7 @@ class ODEfunc(nn.Module):
                 divergence = divergence.view(batchsize, 1)
                 self.sqjacnorm = sqjacnorm
             
-            print('states[:2]: ',states[:2])
+            print('states[:2][:1].size: ',states[:2][0].size())
             if self.residual:
                 dy = dy - y
                 divergence -= torch.ones_like(divergence) * torch.tensor(np.prod(y.shape[1:]), dtype=torch.float32

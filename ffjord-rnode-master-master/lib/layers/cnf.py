@@ -78,6 +78,7 @@ class CNF(nn.Module):
 
             if len(integration_times) == 2:
                 state_t = tuple(s[1] for s in state_t)
+                
 
             z_t, logpz_t = state_t[:2]
             reg_states = state_t[2:]
