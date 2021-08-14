@@ -876,6 +876,7 @@ class MyLogger(object):
     self.metrics = []
     self.meters = {}
     self.logstyle = logstyle # One of '%3.3f' or like '%3.3e'
+    self.csvlog_fieldnames = []
 
     ## Need something for distributed training metrics??
 
@@ -914,18 +915,20 @@ class MyLogger(object):
       elif self.logstyle == 'mat':
         print('.mat logstyle not currently supported...')
       else:
-        with open('%s/%s.log' % (self.root, arg), 'a') as f:
+        with open('%s/%s.log' % (self.root, arg), 'a') as g:
           if isinstance(kwargs[arg],str):
-            f.write( str(itr) + ": "  +  kwargs[arg] + "\n")
+            g.write( str(itr) + ": "  +  kwargs[arg] + "\n")
           else:
-            f.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
-      self.meters[arg].update(kwargs[arg])
-      logdict[str(arg)]=fmt.format(kwargs[arg])
+            g.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
+      if not isinstance(kwargs[arg],list):
+        self.meters[arg].update(kwargs[arg])
+        logdict[str(arg)]=fmt.format(kwargs[arg])
     
     if csvlog != None:
       try:
         csvlog.fieldnames = list(set(csvlog.fieldnames +list(logdict.keys())))
         csvlog.writerow(logdict)
+        self.csvlog_fieldnames = csvlog.fieldnames
       except:
         try:
           #csvlog.fieldnames.extend(list(logdict.keys()))
