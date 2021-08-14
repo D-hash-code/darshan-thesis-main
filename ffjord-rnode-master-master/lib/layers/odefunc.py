@@ -123,7 +123,7 @@ class ODEnet(nn.Module):
                 "ignore": diffeq_layers.IgnoreConv2d,
                 "hyper": diffeq_layers.HyperConv2d,
                 "squash": diffeq_layers.SquashConv2d,
-                "concat": diffeq_layers.ConcatConv2d,
+                "concat": diffeq_layers.ConcatConv2d, ## default
                 "concat_v2": diffeq_layers.ConcatConv2d_v2,
                 "concatsquash": diffeq_layers.ConcatSquashConv2d,
                 "blend": diffeq_layers.BlendConv2d,
@@ -149,6 +149,8 @@ class ODEnet(nn.Module):
 
 
         for dim_out, stride in zip(hidden_dims + (input_shape[0],), strides):
+            ## hidden dims + input shape[0] = idims + channels
+            ## strides set to 1 always, so kernel size is 3, *padding is 1 and *transpose False
 
             if stride is None:
                 layer_kwargs = {}
@@ -185,7 +187,7 @@ class ODEnet(nn.Module):
         dx = y
 
         # squeeze
-        for _ in range(self.num_squeeze):
+        for _ in range(self.num_squeeze): ## I think the default is no squeeze
             dx = squeeze(dx, 2)
         for l, layer in enumerate(self.layers):
             dx = layer(t, dx)
@@ -329,19 +331,22 @@ class ODEfunc(nn.Module):
                 t.requires_grad_(True)
                 for s_ in states[2:]:
                     s_.requires_grad_(True)
+                
                 dy = self.diffeq(t, y, *states[2:])
-                # Hack for 2D data to use brute force divergence computation.
-                if not self.training and dy.view(dy.shape[0], -1).shape[1] == 2:
-                    divergence = divergence_bf(dy, y).view(batchsize, 1)
-                else:
-                    divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
-                    divergence = divergence.view(batchsize, 1)
+                
+                divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
+                divergence = divergence.view(batchsize, 1)
                 self.sqjacnorm = sqjacnorm
+            
+            print('states[:2] shape: ',states[:2].size())
             if self.residual:
                 dy = dy - y
                 divergence -= torch.ones_like(divergence) * torch.tensor(np.prod(y.shape[1:]), dtype=torch.float32
                                                                         ).to(divergence)
-            return tuple([dy, -divergence] + [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]])
+            out = tuple([dy, -divergence] + [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]])
+            print('out tuple len: ', len(out))
+            print('out: ', out)
+            return out
         
 
         y = states
