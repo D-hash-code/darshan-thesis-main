@@ -345,7 +345,9 @@ class ODEfunc(nn.Module):
                                                                         ).to(divergence)
             out = tuple([dy, -divergence] + [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]]) 
             print('dy,-divergence: ', [dy, -divergence])
-            print('dy,-divergence: ', [dy, -divergence].size())
+            print('dy size: ', dy.size())
+            print('2nd list ', [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]])
+
             #out tuple len = 2 ; both elements are tensors, the second tensor is [[-0],[-0],[-0]]
             #out[0].size = batch size, channels, height, width
             return out
