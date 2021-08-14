@@ -878,7 +878,8 @@ class MyLogger(object):
     self.logstyle = logstyle # One of '%3.3f' or like '%3.3e'
     self.csvlog_fieldnames = []
     self.csvlog = None
-    self.logdict = {}
+    self.logdict_train = {'itr': 20, 'D_blocks_0_0_conv1_sv0': '0.9950', 'D_blocks_0_0_conv2_sv0': '0.9891', 'D_blocks_0_0_conv_sc_sv0': '0.9966', 'D_blocks_1_0_conv1_sv0': '1.0676', 'D_blocks_1_0_conv2_sv0': '1.0788', 'D_blocks_1_0_conv_sc_sv0': '1.0170', 'D_blocks_2_0_conv1_sv0': '1.0715', 'D_blocks_2_0_conv2_sv0': '1.0906', 'D_blocks_2_0_conv_sc_sv0': '1.0427', 'D_blocks_3_0_conv1_sv0': '1.4055', 'D_blocks_3_0_conv2_sv0': '1.4211', 'D_blocks_3_0_conv_sc_sv0': '1.0775', 'D_blocks_4_0_conv1_sv0': '1.5787', 'D_blocks_4_0_conv2_sv0': '1.8597', 'D_blocks_4_0_conv_sc_sv0': '1.2098', 'D_blocks_5_0_conv1_sv0': '1.7982', 'D_blocks_5_0_conv2_sv0': '1.4489', 'D_blocks_5_0_conv_sc_sv0': '1.1451', 'D_blocks_6_0_conv1_sv0': '1.4377', 'D_blocks_6_0_conv2_sv0': '1.1495', 'D_blocks_6_0_conv_sc_sv0': '1.0785', 'D_blocks_7_0_conv1_sv0': '1.0909', 'D_blocks_7_0_conv2_sv0': '1.0228', 'D_blocks_7_0_conv_sc_sv0': '1.0161', 'D_blocks_8_0_conv1_sv0': '0.9732', 'D_blocks_8_0_conv2_sv0': '0.9920', 'D_blocks_8_0_conv_sc_sv0': '0.9952', 'D_blocks_9_0_conv1_sv0': '0.9861', 'D_blocks_9_0_conv2_sv0': '1.0241', 'D_blocks_9_0_conv_sc_sv0': '1.0063', 'D_linear_sv0': '1.0000', 'D_linear_middle_sv0': '1.0035', 'consistency': '0.0592', 'G_loss': '2.7582', 'D_loss_real': '1.6062', 'D_loss_fake': '0.1413', 'mixed_middle_loss': '0.0453', 'D_loss_mixed_2d': '0.2765', 'D_loss_real_middle': '0.8924', 'D_loss_fake_middle': '0.0036', 'D_loss_real_2d': '0.7138', 'D_loss_fake_2d': '0.1377', 'G_loss_fake_middle': '3.8913', 'G_loss_fake_2d': '1.6251'}
+    self.logdict_test = {'itr':10,'IS_mean_test': 1,'IS_std_test':1, 'FID_test':1}
 
     ## Need something for distributed training metrics??
 
@@ -897,19 +898,21 @@ class MyLogger(object):
 
   # Log in plaintext; this is designed for being read in MATLAB(sorry not sorry)
   def log(self, itr, **kwargs):
+    if self.csvlog != None:
+      if len(self.csvlog.fieldnames)>5:
+        self.logdict= self.logdict_train
+      else:
+        self.logdict=self.logdict_test
+    else: self.logdict={}
+
 
     for arg in kwargs:
       self.logdict['itr'] = itr
-      #print('arg: ', arg)
-      print('logdict: ',self.logdict)
       fmt = '{:.4f}'
+
       if isinstance(kwargs[arg],list):
         mylist = "[ " + ",".join([str(e) for e in kwargs[arg]]) + " ]"
         kwargs[arg] = mylist
-      
-      if arg not in self.meters.keys():
-        self.meters[arg] = utils.RunningAverageMeter(0.97)
-
 
       if arg not in self.metrics:
         if self.reinitialize:
@@ -929,30 +932,14 @@ class MyLogger(object):
           else:
             g.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
       
-      self.meters[arg].update(kwargs[arg])
-      self.logdict[arg]=fmt.format(kwargs[arg])
-      #if self.csvlog != None:
-      #  if str(arg) not in self.csvlog.fieldnames:
-      #    self.csvlog.fieldnames.extend(str(arg))
-      #    self.csvlog_fieldnames.extend(str(arg))
+      if arg in list(self.logdict.keys()):
+        self.logdict[arg]=fmt.format(kwargs[arg])
     
     if self.csvlog != None:
       try:
-        #self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(self.logdict.keys())))
-        for k in self.logdict.keys():
-          if k not in self.csvlog.fieldnames:
-            self.csvlog.fieldnames.extend(k)
-        self.csvlog.writeheader()
         self.csvlog.writerow(self.logdict)
-        self.csvlog_fieldnames = self.csvlog.fieldnames
       except:
-        try:
-          self.csvlog.fieldnames.extend(list(self.logdict.keys()))
-          self.csvlog.fieldnames = list(set(self.csvlog.fieldnames +list(self.logdict.keys())))
-          self.csvlog.writerow(self.logdict)
-          self.csvlog_fieldnames = self.csvlog.fieldnames
-        except:
-          print(f'logging failed at itr: {itr}')
+        print(f'logging failed at itr: {itr}')
 
 
 
