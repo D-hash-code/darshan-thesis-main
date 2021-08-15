@@ -198,16 +198,7 @@ def get_dataset(args):
         im_size = 32 if args.imagesize is None else args.imagesize
         train_set = dset.SVHN(root=args.datadir, split="train", transform=trans(im_size), download=True)
         test_set = dset.SVHN(root=args.datadir, split="test", transform=trans(im_size), download=True)
-    elif args.data == "cifar10":
-        im_dim = 3
-        im_size = 32 if args.imagesize is None else args.imagesize
-        train_set = dset.CIFAR10(
-            root=args.datadir, train=True, transform=tforms.Compose([
-                tforms.Resize(im_size),
-                tforms.RandomHorizontalFlip(),
-            ]), download=True
-        )
-        test_set = dset.CIFAR10(root=args.datadir, train=False, transform=None, download=True)
+
     elif args.data == 'celebahq':
         im_dim = 3
         im_size = 256 if args.imagesize is None else args.imagesize
