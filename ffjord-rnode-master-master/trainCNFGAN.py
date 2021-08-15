@@ -36,7 +36,7 @@ from dist_utils import env_world_size, env_rank
 from torch.utils.data.distributed import DistributedSampler
 
 from lib.networks import Generator, Discriminator
-from lib.utils2 import get_data_loader, generate_images, save_gif
+#from lib.utils2 import get_data_loader, generate_images, save_gif
 
 
 SOLVERS = ["dopri5", "bdf", "rk4", "midpoint", 'adams', 'explicit_adams', 'adaptive_heun', 'bosh3']
