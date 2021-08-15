@@ -1,1 +1,0 @@
-FROM pytorch/pytorch: latest-gpu
