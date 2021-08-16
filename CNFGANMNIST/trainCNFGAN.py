@@ -114,7 +114,7 @@ def get_parser():
 
     parser.add_argument('--validate', type=eval, default=False, choices=[True, False])
 
-    parser.add_argument('--distributed', type=eval, default=True, help='Run distributed training. Default True')
+    parser.add_argument('--distributed', type=eval, default=False, help='Run distributed training. Default True')
     parser.add_argument('--dist-url', default='env://', type=str,
                         help='url used to set up distributed training')
     parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
@@ -553,7 +553,7 @@ if __name__ == "__main__": #def main():
 
                     rv = tuple(torch.tensor(0.).cuda() for r in reg_states)  ##** Switch to .to(device) ?
 
-                    total_gpus, batch_total, r_loss, r_bpd, r_nfe, r_grad_norm, *rv = dist_utils.sum_tensor(metrics).cpu().numpy()
+                    total_gpus, batch_total, r_loss, r_bpd, r_nfe, r_grad_norm, *rv = metrics.cpu().numpy()
 
 
                     ##lg
@@ -699,7 +699,7 @@ if __name__ == "__main__": #def main():
                     loss = lossmean.item()
                     metrics = torch.tensor([1., loss, meandist, steps]).float().cuda()
 
-                    total_gpus, r_bpd, r_mdist, r_steps = dist_utils.sum_tensor(metrics).cpu().numpy()
+                    total_gpus, r_bpd, r_mdist, r_steps = metrics.cpu().numpy()
                     eval_time = time.time()-start
 
                     if write_log:
