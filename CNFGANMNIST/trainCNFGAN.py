@@ -114,7 +114,7 @@ def get_parser():
 
     parser.add_argument('--validate', type=eval, default=False, choices=[True, False])
 
-    parser.add_argument('--distributed', action='store_true', help='Run distributed training. Default True')
+    parser.add_argument('--distributed', type=eval, default=True, help='Run distributed training. Default True')
     parser.add_argument('--dist-url', default='env://', type=str,
                         help='url used to set up distributed training')
     parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
