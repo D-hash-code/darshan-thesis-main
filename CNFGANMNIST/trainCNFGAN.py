@@ -289,6 +289,13 @@ if __name__ == "__main__": #def main():
     with open(args_file_path, 'w') as f:
         yaml.dump(vars(args), f, default_flow_style=False)
 
+    if args.distributed:
+        if write_log: logger.info('Distributed initializing process group')
+        torch.cuda.set_device(args.local_rank)
+        distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=dist_utils.env_world_size(), rank=env_rank())
+        assert(dist_utils.env_world_size() == distributed.get_world_size())
+        if write_log: logger.info("Distributed: success (%d/%d)"%(args.local_rank, distributed.get_world_size()))
+
     # get deivce
     device = torch.device("cuda:%d"%torch.cuda.current_device() if torch.cuda.is_available() else "cpu")
     cvt = lambda x: x.type(torch.float32).to(device, non_blocking=True)
@@ -310,12 +317,18 @@ if __name__ == "__main__": #def main():
     # build model
     regularization_fns, regularization_coeffs = create_regularization_fns(args)
     model = create_model(args, data_shape, regularization_fns).cuda() ##** what does the .cuda() do?
+    if args.distributed: model = dist_utils.DDP(model,
+                                                device_ids=[args.local_rank], 
+                                                output_device=args.local_rank)
 
     traincolumns = append_regularization_keys_header(traincolumns, regularization_fns)
 
     if args.training_type in ['hyb','adv']:
         ##------------Pre-Train Discriminator Configuration--------------------
         netD = Discriminator(args.nc, args.ndf).to(device)
+        if args.distributed: netD = dist_utils.DDP(netD,
+                                                device_ids=[args.local_rank], 
+                                                output_device=args.local_rank)
         criterion = nn.BCELoss()
 
         optimizerD = optim.Adam(netD.parameters(), lr=args.d_lr)
