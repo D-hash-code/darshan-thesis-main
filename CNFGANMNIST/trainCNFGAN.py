@@ -60,7 +60,7 @@ def get_parser():
     parser.add_argument(
         "--nonlinearity", type=str, default="softplus", choices=["tanh", "relu", "softplus", "elu"]
     )
-    parser.add_argument('--solver', type=str, default='dopri5', choices=SOLVERS)
+    parser.add_argument('--solver', type=str, default='rk4', choices=SOLVERS)
     parser.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'sgd'])
     parser.add_argument('--atol', type=float, default=1e-5, help='only for adaptive solvers')
     parser.add_argument('--rtol', type=float, default=1e-5,  help='only for adaptive solvers')
