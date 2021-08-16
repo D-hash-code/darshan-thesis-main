@@ -24,7 +24,7 @@ import lib.layers as ODElayers
 from lib.layers.odefunc import ODEnet
 from lib.layers.squeeze import squeeze, unsqueeze
 import numpy as np
-
+from train_misc import create_regularization_fns
 
 from torch.optim.optimizer import Optimizer
 class Adam16(Optimizer):
@@ -357,7 +357,7 @@ class Generator(nn.Module):
         squeeze_first=args.squeeze_first
         self.fp16=False
 
-
+        regularization_fns, regularization_coeffs = create_regularization_fns(args)
         if squeeze_first:
             bsz, c, w, h = input_size
             c, w, h = c*4, w//2, h//2
@@ -373,7 +373,7 @@ class Generator(nn.Module):
         self.squash_input = True
         self.alpha = args.alpha
         self.squeeze_first = args.squeeze_first
-        self.cnf_kwargs = {}
+        self.cnf_kwargs = {"T": args.time_length, "train_T": args.train_T, "regularization_fns": regularization_fns}
         self.shared = layers.identity()
         self.dim_z = 128
         self.resolution = 128
