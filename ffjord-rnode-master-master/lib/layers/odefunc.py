@@ -320,11 +320,11 @@ class ODEfunc(nn.Module):
             batchsize = y.shape[0]
 
             # Sample and fix the noise.
-            #if self._e is None:
-            #    if self.rademacher:
-            #        self._e = [sample_rademacher_like(y) for k in range(self.div_samples)]
-            #    else:
-            #        self._e = [sample_gaussian_like(y) for k in range(self.div_samples)]
+            if self._e is None:
+                if self.rademacher:
+                    self._e = [sample_rademacher_like(y) for k in range(self.div_samples)]
+                else:
+                    self._e = [sample_gaussian_like(y) for k in range(self.div_samples)]
 
             with torch.set_grad_enabled(True):
                 y.requires_grad_(True)
@@ -332,7 +332,12 @@ class ODEfunc(nn.Module):
                 for s_ in states[2:]:
                     s_.requires_grad_(True)
 
-                dy = self.diffeq(t, y)
+                dy = self.diffeq(t, y, *states[2:])
+
+                divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
+                divergence = divergence.view(batchsize, 1)
+                self.sqjacnorm = sqjacnorm
+
 
             div_out = -torch.zeros(batchsize,1).to(dy)
             #states[:2][:1].size = batch size, channels, height, width
@@ -340,14 +345,14 @@ class ODEfunc(nn.Module):
                 dy = dy - y
                 divergence -= torch.ones_like(divergence) * torch.tensor(np.prod(y.shape[1:]), dtype=torch.float32
                                                                         ).to(divergence)
-            out = tuple([dy, div_out]) 
+            #out = tuple([dy, div_out]) 
             #print('dy,-divergence: ', [dy, -divergence])
             #dy size: batch size, channels, height, width
             #print('2nd list ', [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]]) EMPTY LIST !!! -> []
 
             #out tuple len = 2 ; both elements are tensors, the second tensor is [[-0],[-0],[-0]]
             #out[0].size = batch size, channels, height, width
-            return out
+            return tuple([dy, -divergence] + [torch.zeros_like(s_).requires_grad_(True) for s_ in states[2:]])
         
 
         y = states
