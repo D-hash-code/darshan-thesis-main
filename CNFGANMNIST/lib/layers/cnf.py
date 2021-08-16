@@ -53,7 +53,7 @@ class CNF(nn.Module):
         # Refresh the odefunc statistics.
         self.odefunc.before_odeint()
 
-        if self.density:
+        if True:
             if self.training:
                 state_t = odeint(
                     self.odefunc,
