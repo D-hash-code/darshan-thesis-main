@@ -417,6 +417,7 @@ if __name__ == "__main__": #def main():
             d_acc_meter = utils.RunningAverageMeter(0.97)
 
 
+
     if not args.resume:
         best_loss = float("inf")
         itr = 0
@@ -434,9 +435,9 @@ if __name__ == "__main__": #def main():
     if args.distributed:
         if write_log: logger.info('Syncing machines before training')
         dist_utils.sum_tensor(torch.tensor([1.0]).float().cuda())
-    
-    prev_loss=0
-    prev_D_G_z1=5
+
+    l_av = 2
+    l= 1
     for epoch in range(begin_epoch, args.num_epochs + 1):
         if not args.validate:
             model.train()  # inheritated method from torch nn, activates 'train mode'
@@ -458,7 +459,7 @@ if __name__ == "__main__": #def main():
                     #x = x.clamp_(min=0, max=1 )
 
 
-                    if args.training_type in ['hyb','adv'] and prev_loss<=50:
+                    if args.training_type in ['hyb','adv'] and l_av>l:
                             
                         ##---Training discriminator---------------------------
                         bs = x.shape[0]
@@ -511,7 +512,7 @@ if __name__ == "__main__": #def main():
 
 
                     ## compute loss
-                    if args.training_type in ['hyb','lik'] or prev_loss>50 or prev_D_G_z1<0.000:
+                    if args.training_type in ['hyb','lik'] or l_av<=l:
                         model.zero_grad()
                         optimizer.zero_grad()
 
@@ -529,7 +530,7 @@ if __name__ == "__main__": #def main():
                         loss = loss + reg_loss
                     total_time = count_total_time(model) ##lg
 
-                    if args.training_type in ['hyb','lik'] or prev_loss>50 or prev_D_G_z1<0.000:
+                    if args.training_type in ['hyb','lik'] or l_av<=l:
                         loss.backward()
                     
                     ##lg
@@ -537,7 +538,7 @@ if __name__ == "__main__": #def main():
                     if write_log: steps_meter.update(nfe_opt)
                     
 
-                    if args.training_type in ['hyb','lik'] or prev_loss>50 or prev_D_G_z1<0.001:
+                    if args.training_type in ['hyb','lik'] or l_av<=l:
                         grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                         optimizer.step()
 
@@ -557,9 +558,8 @@ if __name__ == "__main__": #def main():
 
                     total_gpus, batch_total, r_loss, r_bpd, r_nfe, r_grad_norm, *rv = metrics.cpu().numpy()
 
-                    prev_loss = r_loss
-                    prev_D_G_z1 = D_G_z1
-
+                    l_av = loss_meter.avg
+                    l = loss_meter.val
 
                     ##lg
                     if write_log:
@@ -668,7 +668,7 @@ if __name__ == "__main__": #def main():
             else:
                 torch.save({
                     "args": args,
-                    "gen_state_dict": model.module.state_dict() if torch.cuda.is_available() else model.state_dict(),
+                    "gen_state_dict": model.state_dict(),
                     "disc_state_dict": netD.state_dict(),
                     "optim_state_dict": optimizer.state_dict(), 
                     "disc_optim_state_dict": optimizerD.state_dict(), 
