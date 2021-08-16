@@ -436,6 +436,7 @@ if __name__ == "__main__": #def main():
         dist_utils.sum_tensor(torch.tensor([1.0]).float().cuda())
     
     prev_loss=0
+    prev_D_G_z1=5
     for epoch in range(begin_epoch, args.num_epochs + 1):
         if not args.validate:
             model.train()  # inheritated method from torch nn, activates 'train mode'
@@ -510,7 +511,7 @@ if __name__ == "__main__": #def main():
 
 
                     ## compute loss
-                    if args.training_type in ['hyb','lik'] or prev_loss>50:
+                    if args.training_type in ['hyb','lik'] or prev_loss>50 or prev_D_G_z1<0.000:
                         model.zero_grad()
                         optimizer.zero_grad()
 
@@ -528,7 +529,7 @@ if __name__ == "__main__": #def main():
                         loss = loss + reg_loss
                     total_time = count_total_time(model) ##lg
 
-                    if args.training_type in ['hyb','lik'] or prev_loss>50:
+                    if args.training_type in ['hyb','lik'] or prev_loss>50 or prev_D_G_z1<0.000:
                         loss.backward()
                     
                     ##lg
@@ -536,7 +537,7 @@ if __name__ == "__main__": #def main():
                     if write_log: steps_meter.update(nfe_opt)
                     
 
-                    if args.training_type in ['hyb','lik'] or prev_loss>50:
+                    if args.training_type in ['hyb','lik'] or prev_loss>50 or prev_D_G_z1<0.001:
                         grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                         optimizer.step()
 
@@ -557,6 +558,7 @@ if __name__ == "__main__": #def main():
                     total_gpus, batch_total, r_loss, r_bpd, r_nfe, r_grad_norm, *rv = metrics.cpu().numpy()
 
                     prev_loss = r_loss
+                    prev_D_G_z1 = D_G_z1
 
 
                     ##lg
