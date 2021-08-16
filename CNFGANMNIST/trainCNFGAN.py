@@ -536,7 +536,7 @@ if __name__ == "__main__": #def main():
                     if write_log: steps_meter.update(nfe_opt)
                     
 
-                    if args.training_type in ['hyb','lik']:
+                    if args.training_type in ['hyb','lik'] or prev_loss>100:
                         grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                         optimizer.step()
 
