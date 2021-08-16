@@ -530,7 +530,7 @@ if __name__ == "__main__": #def main():
                     itr_time = time.time() - start
                     wall_clock += itr_time
                     
-                    batch_size = x.size[0]
+                    batch_size = x.size(0)
                     metrics = torch.tensor([1., batch_size,
                                             loss.item(),
                                             bpd.item(),
