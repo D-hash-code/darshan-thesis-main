@@ -47,7 +47,7 @@ def get_parser():
     parser.add_argument("--nworkers", type=int, default=4)
     parser.add_argument("--data", choices=["mnist", "svhn", "cifar10", 'lsun_church', 'celebahq', 'imagenet64'], 
             type=str, default="mnist")
-    parser.add_argument("--training_type",choices=['adv','hyb','lik'], type=str,default='lik')
+    parser.add_argument("--training_type",choices=['adv','hyb','lik'], type=str,default='adv')
     parser.add_argument("--dims", type=str, default="64,64,64")
     parser.add_argument("--strides", type=str, default="1,1,1,1")
     parser.add_argument("--num_blocks", type=int, default=2, help='Number of stacked CNFs.')
@@ -79,7 +79,7 @@ def get_parser():
     parser.add_argument('--train_T', type=eval, default=False)
 
     parser.add_argument("--num_epochs", type=int, default=100)
-    parser.add_argument("--batch_size", type=int, default=200)
+    parser.add_argument("--batch_size", type=int, default=100)
     parser.add_argument(
         "--batch_size_schedule", type=str, default="", help="Increases the batchsize at every given epoch, dash separated."
     )
@@ -110,6 +110,8 @@ def get_parser():
     parser.add_argument("--save", type=str, default="experiments/cnf")
     parser.add_argument("--val_freq", type=int, default=1)
     parser.add_argument("--log_freq", type=int, default=10)
+    parser.add_argument("--sample_freq", type=int, default=100)
+
     parser.add_argument('--validate', type=eval, default=False, choices=[True, False])
 
     parser.add_argument('--distributed', action='store_true', help='Run distributed training. Default True')
@@ -193,52 +195,7 @@ def get_dataset(args):
         im_size = 28 if args.imagesize is None else args.imagesize
         train_set = dset.MNIST(root=args.datadir, train=True, transform=trans(im_size), download=True)
         test_set = dset.MNIST(root=args.datadir, train=False, transform=trans(im_size), download=True)
-    elif args.data == "svhn":
-        im_dim = 3
-        im_size = 32 if args.imagesize is None else args.imagesize
-        train_set = dset.SVHN(root=args.datadir, split="train", transform=trans(im_size), download=True)
-        test_set = dset.SVHN(root=args.datadir, split="test", transform=trans(im_size), download=True)
 
-    elif args.data == 'celebahq':
-        im_dim = 3
-        im_size = 256 if args.imagesize is None else args.imagesize
-        train_set = CelebAHQ(
-            train=True, root=args.datadir, transform=tforms.Compose([
-                tforms.ToPILImage(),
-                tforms.Resize(im_size),
-                tforms.RandomHorizontalFlip(),
-            ])
-        )
-        test_set = CelebAHQ(
-            train=False, root=args.datadir,  transform=tforms.Compose([
-                tforms.ToPILImage(),
-                tforms.Resize(im_size),
-            ])
-        )
-    elif args.data == 'imagenet64':
-        im_dim = 3
-        if args.imagesize != 64:
-            args.imagesize = 64
-        im_size = 64
-        train_set = Imagenet64(train=True, root=args.datadir)
-        test_set = Imagenet64(train=False, root=args.datadir)
-    elif args.data == 'lsun_church':
-        im_dim = 3
-        im_size = 64 if args.imagesize is None else args.imagesize
-        train_set = dset.LSUN(
-            'data', ['church_outdoor_train'], transform=tforms.Compose([
-                tforms.Resize(96),
-                tforms.RandomCrop(64),
-                tforms.Resize(im_size),
-            ])
-        )
-        test_set = dset.LSUN(
-            'data', ['church_outdoor_val'], transform=tforms.Compose([
-                tforms.Resize(96),
-                tforms.RandomCrop(64),
-                tforms.Resize(im_size),
-            ])
-        )
     data_shape = (im_dim, im_size, im_size)
 
     def fast_collate(batch): ##** 
@@ -311,7 +268,7 @@ def create_model(args, data_shape, regularization_fns):
         layer_type=args.layer_type,
         zero_last=args.zero_last,
         alpha=args.alpha,
-        cnf_kwargs={"T": args.time_length, "train_T": args.train_T, "regularization_fns": regularization_fns},
+        cnf_kwargs={},
     )
 
     return model
@@ -320,23 +277,17 @@ def create_model(args, data_shape, regularization_fns):
 if __name__ == "__main__": #def main():
     #os.system('shutdown -c')  # cancel previous shutdown command
 
+    write_log=True
     ##lg done
-    if write_log:
-        utils.makedirs(args.save)
-        logger = utils.get_logger(logpath=os.path.join(args.save, 'logs'), filepath=os.path.abspath(__file__))
 
-        logger.info(args)
+    utils.makedirs(args.save)
+    logger = utils.get_logger(logpath=os.path.join(args.save, 'logs'), filepath=os.path.abspath(__file__))
 
-        args_file_path = os.path.join(args.save, 'args.yaml')
-        with open(args_file_path, 'w') as f:
-            yaml.dump(vars(args), f, default_flow_style=False)
+    logger.info(args)
 
-    if args.distributed:
-        if write_log: logger.info('Distributed initializing process group')
-        torch.cuda.set_device(args.local_rank)
-        distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url, world_size=dist_utils.env_world_size(), rank=env_rank())
-        assert(dist_utils.env_world_size() == distributed.get_world_size())
-        if write_log: logger.info("Distributed: success (%d/%d)"%(args.local_rank, distributed.get_world_size()))
+    args_file_path = os.path.join(args.save, 'args.yaml')
+    with open(args_file_path, 'w') as f:
+        yaml.dump(vars(args), f, default_flow_style=False)
 
     # get deivce
     device = torch.device("cuda:%d"%torch.cuda.current_device() if torch.cuda.is_available() else "cpu")
@@ -675,7 +626,14 @@ if __name__ == "__main__": #def main():
                                         regularization_fns, rv)
                             logger.info(log_message)
 
-
+                        if itr % args.sample_freq == 0:
+                            with torch.no_grad():
+                                fig_filename = os.path.join(args.save, "figs", "Epoch_{:04d}_Itr_{:04d}.jpg".format(epoch,itr))
+                                utils.makedirs(os.path.dirname(fig_filename))
+                                generated_samples, _, _ = model(fixed_z, reverse=True)
+                                generated_samples = generated_samples.view(-1, *data_shape)
+                                nb = int(np.ceil(np.sqrt(float(fixed_z.size(0)))))
+                                save_image(unshift(generated_samples, nbits=args.nbits), fig_filename, nrow=nb)
 
                     itr += 1
 

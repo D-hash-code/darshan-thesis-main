@@ -352,6 +352,7 @@ class Generator(nn.Module):
         hidden_dims = tuple(map(int, args.dims.split(",")))
         strides = tuple(map(int, args.strides.split(",")))
         
+
         data_shape=(3,128,128)
         input_size = (args.batch_size, *data_shape)
         squeeze_first=args.squeeze_first
