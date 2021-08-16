@@ -457,7 +457,7 @@ if __name__ == "__main__": #def main():
                     #x = x.clamp_(min=0, max=1 )
 
 
-                    if args.training_type in ['hyb','adv'] and prev_loss<=100:
+                    if args.training_type in ['hyb','adv'] and prev_loss<=50:
                             
                         ##---Training discriminator---------------------------
                         bs = x.shape[0]
@@ -510,7 +510,7 @@ if __name__ == "__main__": #def main():
 
 
                     ## compute loss
-                    if args.training_type in ['hyb','lik'] or prev_loss>100:
+                    if args.training_type in ['hyb','lik'] or prev_loss>50:
                         model.zero_grad()
                         optimizer.zero_grad()
 
@@ -528,7 +528,7 @@ if __name__ == "__main__": #def main():
                         loss = loss + reg_loss
                     total_time = count_total_time(model) ##lg
 
-                    if args.training_type in ['hyb','lik'] or prev_loss>100:
+                    if args.training_type in ['hyb','lik'] or prev_loss>50:
                         loss.backward()
                     
                     ##lg
@@ -536,7 +536,7 @@ if __name__ == "__main__": #def main():
                     if write_log: steps_meter.update(nfe_opt)
                     
 
-                    if args.training_type in ['hyb','lik'] or prev_loss>100:
+                    if args.training_type in ['hyb','lik'] or prev_loss>50:
                         grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                         optimizer.step()
 
