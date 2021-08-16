@@ -339,7 +339,7 @@ class ODEfunc(nn.Module):
                 self.sqjacnorm = sqjacnorm
 
 
-            div_out = -torch.zeros(batchsize,1).to(dy)
+            #div_out = -torch.zeros(batchsize,1).to(dy)
             #states[:2][:1].size = batch size, channels, height, width
             if self.residual:
                 dy = dy - y
