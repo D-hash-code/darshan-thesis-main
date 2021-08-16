@@ -310,9 +310,6 @@ if __name__ == "__main__": #def main():
     # build model
     regularization_fns, regularization_coeffs = create_regularization_fns(args)
     model = create_model(args, data_shape, regularization_fns).cuda() ##** what does the .cuda() do?
-    if args.distributed: model = dist_utils.DDP(model,
-                                                device_ids=[args.local_rank], 
-                                                output_device=args.local_rank)
 
     traincolumns = append_regularization_keys_header(traincolumns, regularization_fns)
 
@@ -498,7 +495,7 @@ if __name__ == "__main__": #def main():
                         ##---------------------------------------------------
 
 
-                    # compute loss
+                    ## compute loss
                     if args.training_type in ['hyb','lik']:
                         model.zero_grad()
                         optimizer.zero_grad()

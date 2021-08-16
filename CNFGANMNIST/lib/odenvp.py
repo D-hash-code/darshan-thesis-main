@@ -123,7 +123,7 @@ class ODENVP(nn.Module):
         _logpx = torch.zeros(x.shape[0], 1).to(x) if logpx is None else logpx
         out = []
         for idx in range(len(self.transforms)):
-            x, _logpx, reg_states = self.transforms[idx].forward(x, _logpx, reg_states)
+            x, _logpx, reg_states = self.transforms[idx].forward(x, _logpx, reg_states,reverse=False)
             if idx < len(self.transforms) - 1:
                 d = x.size(1) // 2
                 x, factor_out = x[:, :d], x[:, d:]
