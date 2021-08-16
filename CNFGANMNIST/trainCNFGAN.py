@@ -446,7 +446,7 @@ if __name__ == "__main__": #def main():
 
             ##lg
             with open(trainlog,'a') as f:
-                if write_log: csvlogger = csv.DictWriter(f, traincolumns) ##**
+                csvlogger = csv.DictWriter(f, traincolumns) ##**
 
                 for _, (x, y) in enumerate(train_loader):
                     start = time.time() ##lg
