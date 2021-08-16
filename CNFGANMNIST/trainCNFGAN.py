@@ -456,7 +456,8 @@ if __name__ == "__main__": #def main():
                     x = add_noise(cvt(x), nbits=args.nbits)
                     #x = x.clamp_(min=0, max=1 )
 
-                    if args.training_type in ['hyb','adv']:
+                    prev_loss = 0
+                    if args.training_type in ['hyb','adv'] and prev_loss<=100:
                             
                         ##---Training discriminator---------------------------
                         bs = x.shape[0]
@@ -509,7 +510,7 @@ if __name__ == "__main__": #def main():
 
 
                     ## compute loss
-                    if args.training_type in ['hyb','lik']:
+                    if args.training_type in ['hyb','lik'] or prev_loss>100:
                         model.zero_grad()
                         optimizer.zero_grad()
 
@@ -527,7 +528,7 @@ if __name__ == "__main__": #def main():
                         loss = loss + reg_loss
                     total_time = count_total_time(model) ##lg
 
-                    if args.training_type in ['hyb','lik']:
+                    if args.training_type in ['hyb','lik'] or prev_loss>100:
                         loss.backward()
                     
                     ##lg
@@ -554,6 +555,8 @@ if __name__ == "__main__": #def main():
                     rv = tuple(torch.tensor(0.).cuda() for r in reg_states)  ##** Switch to .to(device) ?
 
                     total_gpus, batch_total, r_loss, r_bpd, r_nfe, r_grad_norm, *rv = metrics.cpu().numpy()
+
+                    prev_loss = r_loss
 
 
                     ##lg
