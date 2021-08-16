@@ -488,7 +488,7 @@ if __name__ == "__main__": #def main():
                         lossG = criterion(output, label)
                         if args.training_type == 'adv':
                             lossG.backward()
-                            grad_norm_adv_g = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                             optimizer.step()
                         D_G_z2 = output.mean().item() ##lg
                         
