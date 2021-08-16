@@ -435,7 +435,7 @@ if __name__ == "__main__": #def main():
         if write_log: logger.info('Syncing machines before training')
         dist_utils.sum_tensor(torch.tensor([1.0]).float().cuda())
     
-
+    prev_loss=0
     for epoch in range(begin_epoch, args.num_epochs + 1):
         if not args.validate:
             model.train()  # inheritated method from torch nn, activates 'train mode'
@@ -456,7 +456,7 @@ if __name__ == "__main__": #def main():
                     x = add_noise(cvt(x), nbits=args.nbits)
                     #x = x.clamp_(min=0, max=1 )
 
-                    prev_loss = 0
+
                     if args.training_type in ['hyb','adv'] and prev_loss<=100:
                             
                         ##---Training discriminator---------------------------
