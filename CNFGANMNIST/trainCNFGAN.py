@@ -558,8 +558,7 @@ if __name__ == "__main__": #def main():
 
                     total_gpus, batch_total, r_loss, r_bpd, r_nfe, r_grad_norm, *rv = metrics.cpu().numpy()
 
-                    l_av = loss_meter.avg
-                    l = loss_meter.val
+
 
                     ##lg
                     if write_log:
@@ -568,6 +567,8 @@ if __name__ == "__main__": #def main():
                         loss_meter.update(r_loss/total_gpus)
                         grad_meter.update(r_grad_norm/total_gpus)
                         tt_meter.update(total_time)
+                        l_av = loss_meter.avg
+                        l = loss_meter.val
 
                         fmt = '{:.4f}'
                         logdict = {'itr':itr, 
