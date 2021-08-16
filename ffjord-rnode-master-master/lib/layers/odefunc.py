@@ -308,7 +308,7 @@ class ODEfunc(nn.Module):
         return self._num_evals.item()
 
     def forward(self, t, states):
-        if self.density:
+        if True: # self.density:
             assert len(states) >= 2
             y = states[0]
 
