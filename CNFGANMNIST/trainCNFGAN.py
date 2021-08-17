@@ -417,6 +417,26 @@ if __name__ == "__main__": #def main():
             d_acc_meter = utils.RunningAverageMeter(0.97)
 
 
+        # restore parameters
+    if args.resume is not None:
+        checkpt = torch.load(args.resume, map_location = lambda storage, loc: storage.cuda(args.local_rank))
+        model.load_state_dict(checkpt["gen_state_dict"])
+        netD.load_state_dict(checkpt['disc_state_dict'])
+        if "optim_state_dict" in checkpt.keys():
+            optimizer.load_state_dict(checkpt["optim_state_dict"])
+            # Manually move optimizer state to device.
+            for state in optimizer.state.values():
+                for k, v in state.items():
+                    if torch.is_tensor(v):
+                        state[k] = cvt(v)
+        if "disc_optim_state_dict" in checkpt.keys():
+            optimizerD.load_state_dict(checkpt["disc_optim_state_dict"])
+            # Manually move optimizer state to device.
+            for state in optimizerD.state.values():
+                for k, v in state.items():
+                    if torch.is_tensor(v):
+                        state[k] = cvt(v)
+
 
     if not args.resume:
         best_loss = float("inf")
@@ -518,9 +538,11 @@ if __name__ == "__main__": #def main():
 
                     bpd, (x, z), reg_states = compute_bits_per_dim(x, model)
                     if np.isnan(bpd.data.item()):
-                        raise ValueError('model returned nan during training')
+                        #raise ValueError('model returned nan during training')
+                        logger.info('model returned nan during training')
                     elif np.isinf(bpd.data.item()):
-                        raise ValueError('model returned inf during training')
+                        #raise ValueError('model returned inf during training')
+                        logger.info('model returned inf during training')
                     
                     loss = bpd
                     if regularization_coeffs:
